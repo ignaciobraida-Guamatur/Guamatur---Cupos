@@ -345,7 +345,7 @@ let currentUser=null,currentRol=null,currentVueloId=null,currentPasajeroId=null,
 let temporadas=[],temporadaActiva=null,vuelosData=[],tramosCount=0,dashFiltro='todos';
 let reservarVueloId=null,reservarLugaresLibres=0,reservarLugaresIds=[];
 
-async function loginGoogle(){await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin}})}
+async function loginGoogle(){await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:'https://ignaciobraida-guamatur.github.io/Guamatur---Cupos/'}})}
 async function cerrarSesion(){await sb.auth.signOut();window.location.reload()}
 
 async function iniciarSesion(session){
