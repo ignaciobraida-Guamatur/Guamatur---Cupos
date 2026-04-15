@@ -655,17 +655,24 @@ async function cargarDetalle(vueloId){
 
 // ── MODAL PASAJERO ───────────────────────────────
 function abrirModalPasajero(lugarId,pasajero,vueloId,infant=null){
-  currentLugarId=lugarId;currentVueloId=vueloId;currentPasajeroId=pasajero.id||null;
-  document.getElementById('p-apellido1').value=pasajero.primer_apellido||'';
-  document.getElementById('p-apellido2').value=pasajero.segundo_apellido||'';
-  document.getElementById('p-nombre1').value=pasajero.primer_nombre||'';
-  document.getElementById('p-nombre2').value=pasajero.segundo_nombre||'';
-  document.getElementById('p-hotel').value=pasajero.hotel||'';
-  document.getElementById('p-vendedor').value=pasajero.vendedor||'';
-  document.getElementById('p-ficha').value=pasajero.ficha||'';
-  document.getElementById('p-status').value=pasajero.status||'L';
-  document.getElementById('p-factura').value=pasajero.factura||'';
-  const tieneInfant=infant!==null;
+  currentLugarId=lugarId;currentVueloId=vueloId;
+  // Si es lugar libre (sin id de pasajero), limpiar todo
+  const esLibre=!pasajero||!pasajero.id;
+  currentPasajeroId=esLibre?null:(pasajero.id||null);
+  document.getElementById('p-apellido1').value=esLibre?'':(pasajero.primer_apellido||'');
+  document.getElementById('p-apellido2').value=esLibre?'':(pasajero.segundo_apellido||'');
+  document.getElementById('p-nombre1').value=esLibre?'':(pasajero.primer_nombre||'');
+  document.getElementById('p-nombre2').value=esLibre?'':(pasajero.segundo_nombre||'');
+  document.getElementById('p-hotel').value=esLibre?'':(pasajero.hotel||'');
+  document.getElementById('p-vendedor').value=esLibre?'':(pasajero.vendedor||'');
+  document.getElementById('p-ficha').value=esLibre?'':(pasajero.ficha||'');
+  document.getElementById('p-status').value=esLibre?'L':(pasajero.status||'L');
+  document.getElementById('p-factura').value=esLibre?'':(pasajero.factura||'');
+  // Refrescar dropdown vendedores
+  const sel=document.getElementById('p-vendedor');
+  sel.innerHTML='<option value="">Seleccionar...</option>'+vendedores.map(v=>`<option value="${v.nombre}">${v.nombre}</option>`).join('');
+  if(!esLibre) sel.value=pasajero.vendedor||'';
+  const tieneInfant=infant!==null&&!esLibre;
   document.getElementById('p-tiene-infant').checked=tieneInfant;
   document.getElementById('pi-apellido').value=infant?.primer_apellido||'';
   document.getElementById('pi-nombre').value=infant?.primer_nombre||'';
