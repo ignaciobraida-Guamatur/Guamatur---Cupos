@@ -420,7 +420,8 @@ async function iniciarSesion(session){
     currentRol=u.rol;
   }
   // Cargar vendedores
-  const {data:vends}=await sb.from('usuarios').select('nombre,email').order('nombre');
+  const {data:vends,error:ve}=await sb.from('usuarios').select('nombre,email,rol').order('nombre');
+  console.log('vendedores cargados:',vends?.length,ve);
   vendedores=vends||[];
   // Poblar dropdown vendedor
   const sel=document.getElementById('p-vendedor');
@@ -699,8 +700,7 @@ async function guardarPasajero(){
   if(!currentPasajeroId&&status==='R') datos.fecha_reserva=ahoraUY().toISOString();
   let pasajeroId=currentPasajeroId,error;
   if(currentPasajeroId){({error}=await sb.from('pasajeros').update(datos).eq('id',currentPasajeroId));}
-  else{const {data:np,error:e}=await sb.from('pasajeros').insert(datos).select().single();error=e;if(np)pasajeroId=np.id;}
-  if(error){setBtnLoading('btn-guardar-pasajero',false,'Guardar');mostrarAlerta('modal-p-alert',error.message,'error');return;}
+  else{const {data:np,error:e}=await sb.from('pasajeros').insert(datos).select().single();error=e;if(np)pasajeroId=np.id;}  if(error){setBtnLoading('btn-guardar-pasajero',false,'Guardar');mostrarAlerta('modal-p-alert',error.message,'error');return;}
   const tieneInfant=document.getElementById('p-tiene-infant').checked;
   if(pasajeroId){
     if(tieneInfant){
