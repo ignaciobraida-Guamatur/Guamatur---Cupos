@@ -294,22 +294,29 @@
 
 <!-- MODAL CANCELAR -->
 <div id="modal-cancelar" class="modal-overlay" style="display:none">
-  <div class="modal">
-    <div class="modal-title">Cancelar lugar</div>
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title">Cancelar lugares</div>
     <div id="modal-c-alert"></div>
     <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;padding:10px;font-size:13px;color:var(--yellow);margin-bottom:16px">
-      El lugar quedará marcado como cancelado (amarillo). Se puede registrar penalidad y recupero.
+      Los lugares seleccionados quedarán cancelados (amarillo) sin datos de pasajero.
     </div>
-    <div class="form-group">
-      <label class="form-label">Penalidad (USD)</label>
-      <input class="form-input" id="c-penalidad" type="number" min="0" step="0.01" placeholder="0"/>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <span style="font-size:12px;color:var(--muted)">Seleccioná los lugares a cancelar</span>
+      <button class="btn-sm" onclick="seleccionarTodosLugares()">Cancelar vuelo completo</button>
     </div>
-    <div class="form-group">
-      <label class="form-label">Recupero (USD)</label>
-      <input class="form-input" id="c-recupero" type="number" min="0" step="0.01" placeholder="0"/>
+    <div id="c-lugares-lista" style="max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:14px"></div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Penalidad (USD)</label>
+        <input class="form-input" id="c-penalidad" type="number" min="0" step="0.01" placeholder="0"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Recupero (USD)</label>
+        <input class="form-input" id="c-recupero" type="number" min="0" step="0.01" placeholder="0"/>
+      </div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="cerrarModal('modal-cancelar')">Cancelar</button>
+      <button class="btn btn-outline" onclick="cerrarModal('modal-cancelar')">Cerrar</button>
       <button class="btn btn-warning" id="btn-confirmar-cancelar" onclick="confirmarCancelacion()">Confirmar cancelación</button>
     </div>
   </div>
@@ -605,7 +612,7 @@ async function cargarDetalle(vueloId){
       <button class="btn btn-outline" onclick="goTo('vuelos')">← Volver</button>
       <button class="btn btn-success" onclick="abrirModalReservar('${vueloId}',${lV},'${idsLibres.join(',')}')">+ Reservar lugares</button>
       <button class="btn btn-excel" onclick="exportarExcel('${vueloId}','${vuelo.nombre}')">⬇ Excel</button>
-      ${esAdmin?`<button class="btn btn-outline" onclick="abrirEditarVuelo('${vueloId}')">✏ Editar vuelo</button>`:''}
+      ${esAdmin?`<button class="btn btn-warning" onclick="abrirModalCancelar('${vueloId}')">⚠ Cancelar lugares</button><button class="btn btn-outline" onclick="abrirEditarVuelo('${vueloId}')">✏ Editar vuelo</button>`:''}
     </div>
   </div>`;
 
@@ -641,9 +648,8 @@ async function cargarDetalle(vueloId){
       <td>${p?.factura||'—'}</td>
       <td>${formatFechaHora(p?.fecha_reserva)}</td>
       <td class="${vencido&&st==='R'?'vencimiento-warn':'vencimiento-ok'}">${st==='R'?vText:'—'}</td>
-      ${esAdmin?`<td>${p?.ficha||'—'}</td><td style="display:flex;gap:4px">
+      ${esAdmin?`<td>${p?.ficha||'—'}</td><td>
         <button class="btn-sm" onclick="abrirModalPasajero('${l.id}',${pJson},'${vuelo.id}',${inf?JSON.stringify(inf).replace(/"/g,'&quot;'):'null'})">Editar</button>
-        ${!cancelado&&st!=='L'?`<button class="btn-sm" style="color:var(--yellow);border-color:rgba(251,191,36,0.3)" onclick="abrirModalCancelar('${l.id}','${p?.id}','${vueloId}')">Cancelar</button>`:''}
       </td>`:''}
     </tr>`;
     if(inf){
@@ -761,28 +767,64 @@ async function confirmarReserva(){
 }
 
 // ── MODAL CANCELAR ───────────────────────────────
-function abrirModalCancelar(lugarId,pasajeroId,vueloId){
-  cancelarLugarId=lugarId;cancelarPasajeroId=pasajeroId;cancelarVueloId=vueloId;
+let cancelarLugaresList=[];
+
+async function abrirModalCancelar(vueloId){
+  cancelarVueloId=vueloId;
   document.getElementById('c-penalidad').value='';
   document.getElementById('c-recupero').value='';
   document.getElementById('modal-c-alert').innerHTML='';
   document.getElementById('btn-confirmar-cancelar').disabled=false;
   document.getElementById('btn-confirmar-cancelar').textContent='Confirmar cancelación';
+  // Cargar lugares del vuelo
+  const {data:lugares}=await sb.from('lugares').select('*,pasajeros(id,status,cancelado,primer_apellido,primer_nombre)').eq('vuelo_id',vueloId).eq('es_infant',false).order('numero_lugar');
+  cancelarLugaresList=lugares||[];
+  const lista=document.getElementById('c-lugares-lista');
+  lista.innerHTML=cancelarLugaresList.map(l=>{
+    const p=l.pasajeros?.[0];
+    const cancelado=p?.cancelado;
+    const st=p?.status||'L';
+    const nombre=p?.primer_apellido?`${p.primer_apellido} ${p.primer_nombre||''}`.trim():'(Libre)';
+    const stBadge=cancelado?'<span class="badge badge-yellow">CANCEL</span>':st==='V'?'<span class="badge badge-v">V</span>':st==='R'?'<span class="badge badge-r">R</span>':'<span class="badge badge-l">L</span>';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border)">
+      <input type="checkbox" id="chk-${l.id}" value="${l.id}" ${cancelado?'disabled checked':''} style="width:16px;height:16px;cursor:pointer"/>
+      <span style="font-family:'DM Mono',monospace;font-weight:500;min-width:24px">${l.numero_lugar}</span>
+      ${stBadge}
+      <span style="font-size:13px;color:${cancelado?'var(--muted)':'var(--text)'}">${nombre}</span>
+    </div>`;
+  }).join('');
   document.getElementById('modal-cancelar').style.display='flex';
 }
 
+function seleccionarTodosLugares(){
+  cancelarLugaresList.forEach(l=>{
+    const chk=document.getElementById(`chk-${l.id}`);
+    if(chk&&!chk.disabled) chk.checked=true;
+  });
+}
+
 async function confirmarCancelacion(){
+  const seleccionados=cancelarLugaresList.filter(l=>{
+    const chk=document.getElementById(`chk-${l.id}`);
+    return chk&&chk.checked&&!chk.disabled;
+  });
+  if(!seleccionados.length){mostrarAlerta('modal-c-alert','Seleccioná al menos un lugar','error');return;}
   setBtnLoading('btn-confirmar-cancelar',true,'Confirmar cancelación');
   const penalidad=parseFloat(document.getElementById('c-penalidad').value)||0;
   const recupero=parseFloat(document.getElementById('c-recupero').value)||0;
-  const [r1,r2]=await Promise.all([
-    sb.from('pasajeros').update({status:'L',cancelado:true,factura:null,fecha_reserva:null,actualizado_en:new Date().toISOString()}).eq('id',cancelarPasajeroId),
-    sb.from('cancelaciones').insert({lugar_id:cancelarLugarId,vuelo_id:cancelarVueloId,penalidad_usd:penalidad,recupero_usd:recupero,fecha:new Date().toISOString()})
-  ]);
+  const errors=[];
+  for(const l of seleccionados){
+    const p=l.pasajeros?.[0];
+    if(p?.id){
+      const {error}=await sb.from('pasajeros').update({status:'L',cancelado:true,factura:null,fecha_reserva:null,primer_apellido:null,primer_nombre:null,segundo_apellido:null,segundo_nombre:null,hotel:null,vendedor:null,ficha:null,actualizado_en:new Date().toISOString()}).eq('id',p.id);
+      if(error) errors.push(error.message);
+    }
+    await sb.from('cancelaciones').insert({lugar_id:l.id,vuelo_id:cancelarVueloId,penalidad_usd:penalidad,recupero_usd:recupero,fecha:new Date().toISOString()});
+  }
   setBtnLoading('btn-confirmar-cancelar',false,'Confirmar cancelación');
-  if(r1.error){mostrarAlerta('modal-c-alert',r1.error.message,'error');return;}
-  mostrarAlerta('modal-c-alert','Lugar cancelado correctamente','success');
-  setTimeout(()=>{cerrarModal('modal-cancelar');cargarDetalle(cancelarVueloId)},800);
+  if(errors.length>0){mostrarAlerta('modal-c-alert','Error: '+errors[0],'error');return;}
+  mostrarAlerta('modal-c-alert',`${seleccionados.length} lugar${seleccionados.length>1?'es':''} cancelado${seleccionados.length>1?'s':''} correctamente`,'success');
+  setTimeout(()=>{cerrarModal('modal-cancelar');cargarDetalle(cancelarVueloId)},1000);
 }
 
 // ── EXPORTAR EXCEL ───────────────────────────────
