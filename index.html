@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -68,7 +69,7 @@
   .stat-label{font-size:10px;color:var(--muted);text-transform:uppercase}
   .detalle-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:16px}
   .detalle-titulo{font-size:20px;font-weight:600;margin-bottom:4px}
-  .detalle-meta{font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:6px}
+  .detalle-meta{font-size:13px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:6px}
   .detalle-actions{display:flex;gap:8px;flex-shrink:0}
   .row-v td{background:rgba(255,59,59,0.12)!important}
   .row-r td{background:rgba(255,128,0,0.12)!important}
@@ -103,10 +104,10 @@
   .temp-btn{padding:5px 12px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;transition:all 0.15s}
   .temp-btn:hover{color:var(--text);background:var(--surface2)}
   .temp-btn.active{background:var(--accent);color:white;border-color:var(--accent)}
-  .info-panel{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;font-size:12px}
-  .info-item{display:flex;flex-direction:column;gap:2px}
-  .info-item-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
-  .info-item-value{font-weight:500;font-size:13px}
+  .info-panel{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:16px;display:flex;gap:28px;flex-wrap:wrap}
+  .info-item{display:flex;flex-direction:column;gap:4px}
+  .info-item-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
+  .info-item-value{font-weight:600;font-size:16px}
   .itinerario-table{width:100%;border-collapse:collapse;font-size:12px}
   .itinerario-table th{background:#2a2200;color:var(--yellow);padding:6px 10px;text-align:left;font-size:11px;font-weight:500}
   .itinerario-table td{padding:6px 10px;border-bottom:1px solid rgba(251,191,36,0.1);color:var(--text)}
@@ -200,7 +201,7 @@
       <div class="form-group"><label class="form-label">Primer nombre</label><input class="form-input" id="p-nombre1"/></div>
       <div class="form-group"><label class="form-label">Segundo nombre</label><input class="form-input" id="p-nombre2"/></div>
       <div class="form-group full"><label class="form-label">Hotel</label><input class="form-input" id="p-hotel"/></div>
-      <div class="form-group"><label class="form-label">Vendedor</label><input class="form-input" id="p-vendedor"/></div>
+      <div class="form-group"><label class="form-label">Vendedor</label><input class="form-input" id="p-vendedor" placeholder="Nombre del vendedor"/></div>
       <div class="form-group"><label class="form-label">Ficha</label><input class="form-input" id="p-ficha"/></div>
       <div class="form-group" id="p-status-group">
         <label class="form-label">Status</label>
@@ -212,7 +213,6 @@
       </div>
       <div class="form-group"><label class="form-label">Factura <span style="color:var(--muted)">(req. para V)</span></label><input class="form-input" id="p-factura"/></div>
     </div>
-    <!-- INFANT asociado -->
     <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <span style="font-size:12px;color:var(--muted)">INFANT asociado a este pasajero</span>
@@ -284,11 +284,12 @@
       <div class="form-group full"><label class="form-label">Temporada</label><select class="form-select" id="v-temporada"></select></div>
       <div class="form-group">
         <label class="form-label">Destino</label>
-        <select class="form-select" id="v-destino"><option value="Brasil">Brasil</option><option value="Caribe">Caribe</option></select>
+        <select class="form-select" id="v-destino"><option value="">Seleccionar...</option><option value="Brasil">Brasil</option><option value="Caribe">Caribe</option></select>
       </div>
       <div class="form-group">
         <label class="form-label">Ciudad</label>
         <select class="form-select" id="v-ciudad">
+          <option value="">Seleccionar...</option>
           <option value="CUN|CANCÚN">CANCÚN</option><option value="SSA|SALVADOR">SALVADOR</option>
           <option value="SCL|SANTIAGO DE CHILE">SANTIAGO DE CHILE</option><option value="PMC|PUERTO MONTT">PUERTO MONTT</option>
           <option value="AUA|ARUBA">ARUBA</option><option value="REC|RECIFE">RECIFE</option>
@@ -310,10 +311,10 @@
       </div>
       <div class="form-group"><label class="form-label">Localizador</label><input class="form-input" id="v-localizador" placeholder="Ej: ABC123"/></div>
       <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="v-fecha" type="date"/></div>
-      <div class="form-group"><label class="form-label">Total lugares</label><input class="form-input" id="v-lugares" type="number" min="1"/></div>
-      <div class="form-group"><label class="form-label">Precio de Venta (USD)</label><input class="form-input" id="v-precio" type="number" min="0" step="0.01"/></div>
-      <div class="form-group"><label class="form-label">Valor Neto (USD) <span style="color:var(--accent2);font-size:10px">solo admins</span></label><input class="form-input" id="v-precio-neto" type="number" min="0" step="0.01"/></div>
-      <div class="form-group full"><label class="form-label">Condiciones de equipaje</label><textarea class="form-textarea" id="v-equipaje"></textarea></div>
+      <div class="form-group"><label class="form-label">Total lugares</label><input class="form-input" id="v-lugares" type="number" min="1" placeholder="Ej: 16"/></div>
+      <div class="form-group"><label class="form-label">Precio de Venta (USD)</label><input class="form-input" id="v-precio" type="number" min="0" step="0.01" placeholder="Ej: 990"/></div>
+      <div class="form-group"><label class="form-label">Valor Neto (USD) <span style="color:var(--accent2);font-size:10px">solo admins</span></label><input class="form-input" id="v-precio-neto" type="number" min="0" step="0.01" placeholder="Ej: 750"/></div>
+      <div class="form-group full"><label class="form-label">Condiciones de equipaje</label><textarea class="form-textarea" id="v-equipaje" placeholder="Ej: 1 carry on + 1 equipaje en bodega 23kg"></textarea></div>
     </div>
     <div style="margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -390,14 +391,12 @@ function formatFechaHora(s){
   const u=new Date(d.getTime()+(d.getTimezoneOffset()+(-3*60))*60000);
   return u.toLocaleDateString('es-UY',{day:'2-digit',month:'2-digit'})+' '+String(u.getHours()).padStart(2,'0')+':'+String(u.getMinutes()).padStart(2,'0');
 }
-function vencimientoReserva(s,esVueloC){
+function vencimientoReserva(s,esC){
   if(!s)return{texto:'—',vencido:false};
   const d=new Date(s);if(isNaN(d))return{texto:'—',vencido:false};
-  const hs=esVueloC?12:72;
-  const venc=new Date(d.getTime()+hs*60*60*1000);
+  const venc=new Date(d.getTime()+(esC?12:72)*60*60*1000);
   const u=new Date(venc.getTime()+(venc.getTimezoneOffset()+(-3*60))*60000);
-  const texto=u.toLocaleDateString('es-UY',{day:'2-digit',month:'2-digit'})+' '+String(u.getHours()).padStart(2,'0')+':'+String(u.getMinutes()).padStart(2,'0');
-  return{texto,vencido:ahoraUY()>venc};
+  return{texto:u.toLocaleDateString('es-UY',{day:'2-digit',month:'2-digit'})+' '+String(u.getHours()).padStart(2,'0')+':'+String(u.getMinutes()).padStart(2,'0'),vencido:ahoraUY()>venc};
 }
 function horasDesde(s){if(!s)return null;return Math.round((ahoraUY()-new Date(s))/(1000*60*60))}
 function mostrarAlerta(id,msg,tipo){
@@ -414,8 +413,7 @@ function setBtnLoading(id,loading,texto='Guardar'){
   btn.innerHTML=loading?`<span class="spinner-sm"></span>Procesando...`:texto;
 }
 function toggleInfantFields(){
-  const chk=document.getElementById('p-tiene-infant');
-  document.getElementById('infant-fields').style.display=chk.checked?'block':'none';
+  document.getElementById('infant-fields').style.display=document.getElementById('p-tiene-infant').checked?'block':'none';
 }
 
 // ── DASHBOARD ────────────────────────────────────
@@ -429,8 +427,7 @@ async function cargarDashboard(){
   if(!vuelos){cont.innerHTML='<div class="loading" style="color:var(--red)">Error</div>';return;}
   const filtrados=dashFiltro==='todos'?vuelos:vuelos.filter(v=>v.temporada_id===dashFiltro);
   let total=0,vendidos=0,reservados=0,libres=0;
-  const venc72=[],venc12=[];
-  const filas=[];
+  const venc72=[],venc12=[],filas=[];
   filtrados.forEach(v=>{
     const adultos=v.lugares.filter(l=>!l.es_infant);
     let vV=0,rV=0,lV=0;
@@ -442,13 +439,11 @@ async function cargarDashboard(){
     });
     total+=adultos.length;vendidos+=vV;reservados+=rV;libres+=lV;
     const [cls,txt]=alertaMap[calcularAlerta(lV)];
-    filas.push({nombre:v.nombre,destino:v.destino,total:adultos.length,vendidos:vV,reservados:rV,libres:lV,pct:adultos.length>0?Math.round(vV/adultos.length*100):0,cls,txt,id:v.id});
+    filas.push({id:v.id,nombre:v.nombre,destino:v.destino,total:adultos.length,vendidos:vV,reservados:rV,libres:lV,pct:adultos.length>0?Math.round(vV/adultos.length*100):0,cls,txt});
   });
-
-  let filtroHtml=`<div class="filter-bar"><span style="font-size:12px;color:var(--muted)">Filtrar:</span><button class="filter-btn ${dashFiltro==='todos'?'active':''}" onclick="setDashFiltro('todos')">Todos los activos</button>`;
+  let filtroHtml=`<div class="filter-bar"><span style="font-size:12px;color:var(--muted)">Filtrar:</span><button class="filter-btn ${dashFiltro==='todos'?'active':''}" onclick="setDashFiltro('todos')">Todos</button>`;
   (temps||[]).forEach(t=>{filtroHtml+=`<button class="filter-btn ${dashFiltro===t.id?'active':''}" onclick="setDashFiltro('${t.id}')">${t.nombre}</button>`;});
   filtroHtml+='</div>';
-
   let html=filtroHtml+`<div class="kpi-grid">
     <div class="kpi-card"><div class="kpi-label">Total cupos</div><div class="kpi-value c-blue">${total}</div></div>
     <div class="kpi-card"><div class="kpi-label">Vendidos</div><div class="kpi-value c-red">${vendidos}</div></div>
@@ -464,9 +459,7 @@ async function cargarDashboard(){
   </div>
   <div class="section-title" style="margin-bottom:12px">Análisis por destino</div>
   <div class="table-wrap"><table><thead><tr><th>Vuelo</th><th>Destino</th><th>Total</th><th>Vendidos</th><th>Reservados</th><th>Libres</th><th>Ocup.</th><th>Alerta</th></tr></thead><tbody>`;
-  filas.forEach(d=>{
-    html+=`<tr style="cursor:pointer" onclick="goToDetalle('${d.id}')"><td style="color:var(--accent2);font-weight:500">${d.nombre}</td><td><span class="badge badge-${d.destino==='Brasil'?'green':'orange'}">${d.destino||'—'}</span></td><td>${d.total}</td><td>${d.vendidos}</td><td>${d.reservados}</td><td>${d.libres}</td><td>${d.pct}%</td><td><span class="badge ${d.cls}">${d.txt}</span></td></tr>`;
-  });
+  filas.forEach(d=>{html+=`<tr style="cursor:pointer" onclick="goToDetalle('${d.id}')"><td style="color:var(--accent2);font-weight:500">${d.nombre}</td><td><span class="badge badge-${d.destino==='Brasil'?'green':'orange'}">${d.destino||'—'}</span></td><td>${d.total}</td><td>${d.vendidos}</td><td>${d.reservados}</td><td>${d.libres}</td><td>${d.pct}%</td><td><span class="badge ${d.cls}">${d.txt}</span></td></tr>`;});
   html+='</tbody></table></div>';
   cont.innerHTML=html;
 }
@@ -502,11 +495,7 @@ function renderVuelos(lista){
       html+=`<div class="vuelo-card" onclick="goToDetalle('${v.id}')">
         <div>
           <div class="vuelo-nombre">${v.nombre}</div>
-          <div class="vuelo-meta">
-            <span>${v.ciudad_nombre}</span>
-            ${v.fecha?`<span>${formatFecha(v.fecha)}</span>`:''}
-            ${v.precio?`<span style="color:var(--green);font-weight:500">Precio de Venta: USD ${Number(v.precio).toLocaleString('es-UY')}</span>`:''}
-          </div>
+          <div class="vuelo-meta"><span>${v.ciudad_nombre}</span>${v.fecha?`<span>${formatFecha(v.fecha)}</span>`:''}${v.precio?`<span style="color:var(--green);font-weight:500">Precio de Venta: USD ${Number(v.precio).toLocaleString('es-UY')}</span>`:''}</div>
         </div>
         <div class="vuelo-stats">
           <div class="stat"><div class="stat-val c-red">${vV}</div><div class="stat-label">Vendidos</div></div>
@@ -531,18 +520,16 @@ async function cargarDetalle(vueloId){
     sb.from('infants').select('*').eq('vuelo_id',vueloId)
   ]);
   if(!vuelo||!lugares){cont.innerHTML='<div class="loading" style="color:var(--red)">Error</div>';return;}
-
-  // Solo lugares de adultos (no infant)
   const lugaresAdultos=lugares.filter(l=>!l.es_infant);
   const vV=lugaresAdultos.filter(l=>l.pasajeros?.[0]?.status==='V').length;
   const rV=lugaresAdultos.filter(l=>l.pasajeros?.[0]?.status==='R').length;
   const lV=lugaresAdultos.filter(l=>!l.pasajeros?.[0]||l.pasajeros[0].status==='L').length;
   const esVueloC=lV<=5;
   const esAdmin=currentRol==='admin';
-
-  // Mapa de infants por pasajero_id
   const infantMap={};
   (infants||[]).forEach(inf=>{if(inf.pasajero_id)infantMap[inf.pasajero_id]=inf});
+  // IDs de lugares libres para reserva
+  const idsLibres=lugaresAdultos.filter(l=>!l.pasajeros?.[0]||l.pasajeros[0].status==='L').map(l=>l.id);
 
   let html=`<div class="detalle-header">
     <div style="flex:1">
@@ -559,7 +546,7 @@ async function cargarDetalle(vueloId){
     </div>
     <div class="detalle-actions">
       <button class="btn btn-outline" onclick="goTo('vuelos')">← Volver</button>
-      <button class="btn btn-success" onclick="abrirModalReservar('${vuelo.id}',${lV},${JSON.stringify(lugaresAdultos.filter(l=>!l.pasajeros?.[0]||l.pasajeros[0].status==='L').map(l=>l.id))})">+ Reservar lugares</button>
+      <button class="btn btn-success" onclick="abrirModalReservar('${vueloId}',${lV},'${idsLibres.join(',')}')">+ Reservar lugares</button>
     </div>
   </div>`;
 
@@ -567,7 +554,7 @@ async function cargarDetalle(vueloId){
     <div class="info-item"><div class="info-item-label">Vendidos</div><div class="info-item-value c-red">${vV}</div></div>
     <div class="info-item"><div class="info-item-label">Reservados</div><div class="info-item-value c-orange">${rV}</div></div>
     <div class="info-item"><div class="info-item-label">Libres</div><div class="info-item-value c-green">${lV}</div></div>
-    ${vuelo.condiciones_equipaje?`<div class="info-item"><div class="info-item-label">Equipaje</div><div class="info-item-value">${vuelo.condiciones_equipaje}</div></div>`:''}
+    ${vuelo.condiciones_equipaje?`<div class="info-item"><div class="info-item-label">Equipaje</div><div class="info-item-value" style="font-size:14px">${vuelo.condiciones_equipaje}</div></div>`:''}
   </div>`;
 
   if(vuelo.itinerario&&vuelo.itinerario.length>0){
@@ -578,32 +565,27 @@ async function cargarDetalle(vueloId){
   }
 
   html+=`<div class="table-wrap"><table><thead><tr><th>#</th><th>Apellido</th><th>Nombre</th><th>Hotel</th><th>Vendedor</th><th>Status</th><th>Factura</th><th>Fecha reserva</th><th>Vencimiento</th>${esAdmin?'<th>Ficha</th><th></th>':''}</tr></thead><tbody>`;
-
   lugaresAdultos.forEach(l=>{
     const p=l.pasajeros?.[0];
     const st=p?.status||'L';
     const {texto:vText,vencido}=vencimientoReserva(p?.fecha_reserva,esVueloC);
     const pJson=JSON.stringify(p||{}).replace(/"/g,'&quot;');
     const inf=p?.id?infantMap[p.id]:null;
-
     html+=`<tr class="${st==='V'?'row-v':st==='R'?'row-r':''}">
       <td style="font-family:'DM Mono',monospace;font-weight:500">${l.numero_lugar}</td>
       <td>${p?.primer_apellido||'—'}</td><td>${p?.primer_nombre||'—'}</td>
       <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p?.hotel||'—'}</td>
-      <td>${p?.vendedor_id||'—'}</td>
+      <td>${p?.vendedor||'—'}</td>
       <td><span class="badge badge-${st==='V'?'v':st==='R'?'r':'l'}">${st}</span></td>
       <td>${p?.factura||'—'}</td>
       <td>${formatFechaHora(p?.fecha_reserva)}</td>
       <td class="${vencido&&st==='R'?'vencimiento-warn':'vencimiento-ok'}">${st==='R'?vText:'—'}</td>
       ${esAdmin?`<td>${p?.ficha||'—'}</td><td><button class="btn-sm" onclick="abrirModalPasajero('${l.id}',${pJson},'${vuelo.id}',${inf?JSON.stringify(inf).replace(/"/g,'&quot;'):'null'})">Editar</button></td>`:''}
     </tr>`;
-
-    // Fila INFANT si existe
     if(inf){
       html+=`<tr class="row-infant"><td style="color:var(--muted);font-size:11px;padding-left:20px">↳</td><td colspan="${esAdmin?8:7}"><span class="badge badge-infant">INFANT</span> ${inf.primer_nombre||''} ${inf.primer_apellido||''}</td>${esAdmin?'<td></td><td></td>':''}</tr>`;
     }
   });
-
   html+='</tbody></table></div>';
   cont.innerHTML=html;
 }
@@ -616,7 +598,7 @@ function abrirModalPasajero(lugarId,pasajero,vueloId,infant=null){
   document.getElementById('p-nombre1').value=pasajero.primer_nombre||'';
   document.getElementById('p-nombre2').value=pasajero.segundo_nombre||'';
   document.getElementById('p-hotel').value=pasajero.hotel||'';
-  document.getElementById('p-vendedor').value=pasajero.vendedor_id||'';
+  document.getElementById('p-vendedor').value=pasajero.vendedor||'';
   document.getElementById('p-ficha').value=pasajero.ficha||'';
   document.getElementById('p-status').value=pasajero.status||'L';
   document.getElementById('p-factura').value=pasajero.factura||'';
@@ -636,18 +618,23 @@ async function guardarPasajero(){
   const factura=document.getElementById('p-factura').value.trim();
   if(status==='V'&&!factura){mostrarAlerta('modal-p-alert','Factura obligatoria para status V','error');return;}
   setBtnLoading('btn-guardar-pasajero',true);
+
   const datos={
-    lugar_id:currentLugarId,vuelo_id:currentVueloId,
+    lugar_id:currentLugarId,
+    vuelo_id:currentVueloId,
     primer_apellido:document.getElementById('p-apellido1').value,
     segundo_apellido:document.getElementById('p-apellido2').value,
     primer_nombre:document.getElementById('p-nombre1').value,
     segundo_nombre:document.getElementById('p-nombre2').value,
     hotel:document.getElementById('p-hotel').value,
-    vendedor_id:document.getElementById('p-vendedor').value||currentUser.email,
+    vendedor:document.getElementById('p-vendedor').value,
     ficha:document.getElementById('p-ficha').value,
-    status,factura:factura||null,actualizado_en:new Date().toISOString()
+    status,
+    factura:factura||null,
+    actualizado_en:new Date().toISOString()
   };
   if(!currentPasajeroId&&status==='R') datos.fecha_reserva=ahoraUY().toISOString();
+
   let pasajeroId=currentPasajeroId;
   let error;
   if(currentPasajeroId){
@@ -656,22 +643,20 @@ async function guardarPasajero(){
     const {data:np,error:e}=await sb.from('pasajeros').insert(datos).select().single();
     error=e;if(np) pasajeroId=np.id;
   }
+
   if(error){setBtnLoading('btn-guardar-pasajero',false,'Guardar');mostrarAlerta('modal-p-alert',error.message,'error');return;}
 
-  // INFANT
+  // Manejar INFANT
   const tieneInfant=document.getElementById('p-tiene-infant').checked;
-  if(tieneInfant&&pasajeroId){
-    const infantData={
-      vuelo_id:currentVueloId,pasajero_id:pasajeroId,
-      primer_apellido:document.getElementById('pi-apellido').value,
-      primer_nombre:document.getElementById('pi-nombre').value
-    };
-    // Verificar si ya existe
-    const {data:inf}=await sb.from('infants').select('id').eq('pasajero_id',pasajeroId).single();
-    if(inf){await sb.from('infants').update(infantData).eq('id',inf.id);}
-    else{await sb.from('infants').insert(infantData);}
-  } else if(!tieneInfant&&pasajeroId){
-    await sb.from('infants').delete().eq('pasajero_id',pasajeroId);
+  if(pasajeroId){
+    if(tieneInfant){
+      const infantData={vuelo_id:currentVueloId,pasajero_id:pasajeroId,primer_apellido:document.getElementById('pi-apellido').value,primer_nombre:document.getElementById('pi-nombre').value};
+      const {data:inf}=await sb.from('infants').select('id').eq('pasajero_id',pasajeroId).maybeSingle();
+      if(inf){await sb.from('infants').update(infantData).eq('id',inf.id);}
+      else{await sb.from('infants').insert(infantData);}
+    } else {
+      await sb.from('infants').delete().eq('pasajero_id',pasajeroId);
+    }
   }
 
   setBtnLoading('btn-guardar-pasajero',false,'Guardar');
@@ -680,10 +665,10 @@ async function guardarPasajero(){
 }
 
 // ── MODAL RESERVAR ───────────────────────────────
-function abrirModalReservar(vueloId,libres,idsLibres){
+function abrirModalReservar(vueloId,libres,idsStr){
   reservarVueloId=vueloId;
-  reservarLugaresLibres=libres;
-  reservarLugaresIds=idsLibres;
+  reservarLugaresLibres=parseInt(libres);
+  reservarLugaresIds=idsStr?idsStr.split(',').filter(x=>x):[];
   document.getElementById('r-cantidad').value='';
   document.getElementById('r-nombre').value='';
   document.getElementById('r-libres-label').textContent=`(${libres} disponibles)`;
@@ -706,9 +691,8 @@ async function confirmarReserva(){
   const errors=[];
 
   for(const lugarId of idsAReservar){
-    // Verificar si ya tiene pasajero
-    const {data:existing}=await sb.from('pasajeros').select('id').eq('lugar_id',lugarId).single();
-    const datos={lugar_id:lugarId,vuelo_id:reservarVueloId,status:'R',vendedor_id:currentUser.email,fecha_reserva:ahora,actualizado_en:ahora,primer_apellido:nombre,primer_nombre:'(Reserva grupal)'};
+    const {data:existing}=await sb.from('pasajeros').select('id').eq('lugar_id',lugarId).maybeSingle();
+    const datos={lugar_id:lugarId,vuelo_id:reservarVueloId,status:'R',vendedor:currentUser.email,fecha_reserva:ahora,actualizado_en:ahora,primer_apellido:nombre,primer_nombre:'(Reserva grupal)'};
     let err;
     if(existing){({error:err}=await sb.from('pasajeros').update(datos).eq('id',existing.id));}
     else{({error:err}=await sb.from('pasajeros').insert(datos));}
@@ -748,6 +732,7 @@ async function guardarTemporada(){
   setTimeout(()=>{cerrarModal('modal-temporada');cargarAdmin()},800);
 }
 
+// ── ITINERARIO ───────────────────────────────────
 function agregarTramo(){
   const wrap=document.getElementById('tramos-wrap');
   const i=tramosCount++;
@@ -777,8 +762,17 @@ function obtenerItinerario(){
 async function abrirModalVuelo(){
   const {data:temps}=await sb.from('temporadas').select('*').order('creado_en',{ascending:false});
   document.getElementById('v-temporada').innerHTML=(temps||[]).map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
-  ['v-destino','v-ciudad','v-aerolinea'].forEach(id=>{const el=document.getElementById(id);if(el)el.selectedIndex=0});
-  ['v-nombre','v-localizador','v-fecha','v-lugares','v-precio','v-precio-neto','v-equipaje'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+  // Limpiar TODOS los campos
+  document.getElementById('v-destino').value='';
+  document.getElementById('v-ciudad').value='';
+  document.getElementById('v-nombre').value='';
+  document.getElementById('v-aerolinea').value='';
+  document.getElementById('v-localizador').value='';
+  document.getElementById('v-fecha').value='';
+  document.getElementById('v-lugares').value='';
+  document.getElementById('v-precio').value='';
+  document.getElementById('v-precio-neto').value='';
+  document.getElementById('v-equipaje').value='';
   document.getElementById('tramos-wrap').innerHTML='';
   tramosCount=0;
   document.getElementById('modal-v-alert').innerHTML='';
@@ -790,13 +784,14 @@ async function abrirModalVuelo(){
 async function guardarVuelo(){
   const nombre=document.getElementById('v-nombre').value.trim();
   const total_lugares=parseInt(document.getElementById('v-lugares').value);
-  if(!nombre||!total_lugares){mostrarAlerta('modal-v-alert','Nombre y total de lugares son obligatorios','error');return;}
+  const ciudadVal=document.getElementById('v-ciudad').value;
+  if(!nombre||!total_lugares||!ciudadVal){mostrarAlerta('modal-v-alert','Nombre, ciudad y total de lugares son obligatorios','error');return;}
   setBtnLoading('btn-crear-vuelo',true,'Crear vuelo');
-  const [ciudad_codigo,ciudad_nombre]=document.getElementById('v-ciudad').value.split('|');
+  const [ciudad_codigo,ciudad_nombre]=ciudadVal.split('|');
   const itinerario=obtenerItinerario();
   const {data:vuelo,error}=await sb.from('vuelos').insert({
     temporada_id:document.getElementById('v-temporada').value,
-    nombre,destino:document.getElementById('v-destino').value,
+    nombre,destino:document.getElementById('v-destino').value||null,
     ciudad_codigo,ciudad_nombre,
     aerolinea:document.getElementById('v-aerolinea').value||null,
     localizador:document.getElementById('v-localizador').value.trim()||null,
