@@ -668,10 +668,7 @@ function abrirModalPasajero(lugarId,pasajero,vueloId,infant=null){
   document.getElementById('p-ficha').value=esLibre?'':(pasajero.ficha||'');
   document.getElementById('p-status').value=esLibre?'L':(pasajero.status||'L');
   document.getElementById('p-factura').value=esLibre?'':(pasajero.factura||'');
-  // Refrescar dropdown vendedores
-  const sel=document.getElementById('p-vendedor');
-  sel.innerHTML='<option value="">Seleccionar...</option>'+vendedores.map(v=>`<option value="${v.nombre}">${v.nombre}</option>`).join('');
-  if(!esLibre) sel.value=pasajero.vendedor||'';
+  document.getElementById('p-vendedor').value=esLibre?'':(pasajero.vendedor||'');
   const tieneInfant=infant!==null&&!esLibre;
   document.getElementById('p-tiene-infant').checked=tieneInfant;
   document.getElementById('pi-apellido').value=infant?.primer_apellido||'';
