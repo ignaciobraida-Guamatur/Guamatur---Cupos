@@ -498,26 +498,91 @@ function toggleInfantFields(){
 }
 
 // ── DASHBOARD ────────────────────────────────────
+const alertaOrden={COMPLETO:0,ULTIMOS:1,POCOS:2,DISPONIBLE:3};
+
+async function vencerReservasExpiradas(){
+  // Traer todas las reservas activas con R sin factura
+  const {data:pasajeros}=await sb.from('pasajeros')
+    .select('id,vuelo_id,fecha_reserva,factura')
+    .eq('status','R')
+    .is('factura',null)
+    .is('cancelado',false);
+  if(!pasajeros||!pasajeros.length) return;
+
+  // Traer libres por vuelo para saber si es crítico
+  const {data:vistas}=await sb.from('vista_vuelos').select('id,libres');
+  const libresMap={};
+  (vistas||[]).forEach(v=>{libresMap[v.id]=v.libres||0;});
+
+  const ahora=ahoraUY();
+  const aVencer=[];
+  pasajeros.forEach(p=>{
+    if(!p.fecha_reserva) return;
+    const libres=libresMap[p.vuelo_id]||99;
+    const esCritico=libres<=3;
+    const limiteHs=esCritico?12:72;
+    const venc=new Date(new Date(p.fecha_reserva).getTime()+limiteHs*60*60*1000);
+    if(ahora>venc) aVencer.push(p.id);
+  });
+
+  if(aVencer.length>0){
+    await sb.from('pasajeros').update({
+      status:'L',primer_apellido:null,primer_nombre:null,segundo_apellido:null,
+      segundo_nombre:null,hotel:null,vendedor:null,ficha:null,
+      fecha_reserva:null,actualizado_en:new Date().toISOString()
+    }).in('id',aVencer);
+  }
+}
+
 async function cargarDashboard(){
   const cont=document.getElementById('dashboard-content');
   cont.innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
-  const [{data:temps},{data:vuelos}]=await Promise.all([
+
+  // Vencer reservas expiradas antes de cargar
+  await vencerReservasExpiradas();
+
+  const [{data:temps},{data:vuelos},{data:pasajerosDash},{data:cancelsDash}]=await Promise.all([
     sb.from('temporadas').select('*').order('creado_en',{ascending:false}),
-    sb.from('vista_vuelos').select('*')
+    sb.from('vista_vuelos').select('*'),
+    sb.from('pasajeros').select('status,vendedor,vuelo_id,cancelado'),
+    sb.from('cancelaciones').select('penalidad_usd,recupero_usd,vuelo_id')
   ]);
   if(!vuelos){cont.innerHTML='<div class="loading" style="color:var(--red)">Error</div>';return;}
+
   const filtrados=dashFiltro==='todos'?vuelos:vuelos.filter(v=>v.temporada_id===dashFiltro);
+  const vueloIds=new Set(filtrados.map(v=>v.id));
+
   let total=0,vendidos=0,reservados=0,libres=0;
   const filas=[];
   filtrados.forEach(v=>{
     const vV=v.vendidos||0,rV=v.reservados||0,lV=v.libres||0,tot=v.total||0;
     total+=tot;vendidos+=vV;reservados+=rV;libres+=lV;
-    const [cls,txt]=alertaMap[calcularAlerta(lV)];
-    filas.push({id:v.id,nombre:v.nombre,destino:v.destino,total:tot,vendidos:vV,reservados:rV,libres:lV,pct:tot>0?Math.round(vV/tot*100):0,cls,txt});
+    const alerta=calcularAlerta(lV);
+    const [cls,txt]=alertaMap[alerta];
+    filas.push({id:v.id,nombre:v.nombre,destino:v.destino,total:tot,vendidos:vV,reservados:rV,libres:lV,pct:tot>0?Math.round(vV/tot*100):0,cls,txt,orden:alertaOrden[alerta]});
   });
+  // Ordenar por alerta: Completo primero, Disponible último
+  filas.sort((a,b)=>a.orden-b.orden);
+
+  // Ranking vendedores
+  const rankMap={};
+  (pasajerosDash||[]).filter(p=>vueloIds.has(p.vuelo_id)&&p.status==='V'&&p.vendedor).forEach(p=>{
+    rankMap[p.vendedor]=(rankMap[p.vendedor]||0)+1;
+  });
+  const ranking=Object.entries(rankMap).sort((a,b)=>b[1]-a[1]);
+  // Agregar vendedores con 0 ventas
+  vendedores.forEach(v=>{if(!rankMap[v.nombre]) ranking.push([v.nombre,0]);});
+
+  // Cancelaciones
+  const cancelsFiltradas=(cancelsDash||[]).filter(c=>vueloIds.has(c.vuelo_id));
+  const totalCancels=cancelsFiltradas.length;
+  const totalPenalidad=cancelsFiltradas.reduce((s,c)=>s+(c.penalidad_usd||0),0);
+  const totalRecupero=cancelsFiltradas.reduce((s,c)=>s+(c.recupero_usd||0),0);
+
   let filtroHtml=`<div class="filter-bar"><span style="font-size:12px;color:var(--muted)">Filtrar:</span><button class="filter-btn ${dashFiltro==='todos'?'active':''}" onclick="setDashFiltro('todos')">Todos</button>`;
   (temps||[]).forEach(t=>{filtroHtml+=`<button class="filter-btn ${dashFiltro===t.id?'active':''}" onclick="setDashFiltro('${t.id}')">${t.nombre}</button>`;});
   filtroHtml+='</div>';
+
   let html=filtroHtml+`<div class="kpi-grid">
     <div class="kpi-card"><div class="kpi-label">Total cupos</div><div class="kpi-value c-blue">${total}</div></div>
     <div class="kpi-card"><div class="kpi-label">Vendidos</div><div class="kpi-value c-red">${vendidos}</div></div>
@@ -525,10 +590,28 @@ async function cargarDashboard(){
     <div class="kpi-card"><div class="kpi-label">Libres</div><div class="kpi-value c-green">${libres}</div></div>
     <div class="kpi-card"><div class="kpi-label">% Ocupación</div><div class="kpi-value c-purple">${total>0?Math.round(vendidos/total*100):0}%</div></div>
   </div>
+
   <div class="section-title" style="margin-bottom:12px">Análisis por destino</div>
   <div class="table-wrap"><table><thead><tr><th>Vuelo</th><th>Destino</th><th>Total</th><th>Vendidos</th><th>Reservados</th><th>Libres</th><th>Ocup.</th><th>Alerta</th></tr></thead><tbody>`;
   filas.forEach(d=>{html+=`<tr style="cursor:pointer" onclick="goToDetalle('${d.id}')"><td style="color:var(--accent2);font-weight:500">${d.nombre}</td><td><span class="badge badge-${d.destino==='Brasil'?'green':'orange'}">${d.destino||'—'}</span></td><td>${d.total}</td><td>${d.vendidos}</td><td>${d.reservados}</td><td>${d.libres}</td><td>${d.pct}%</td><td><span class="badge ${d.cls}">${d.txt}</span></td></tr>`;});
   html+='</tbody></table></div>';
+
+  // Dashboard vendedores
+  html+=`<div class="section-title" style="margin-bottom:12px">Ranking de vendedores</div>
+  <div class="table-wrap"><table><thead><tr><th>#</th><th>Vendedor</th><th>Lugares vendidos</th></tr></thead><tbody>`;
+  ranking.forEach(([nombre,cant],i)=>{
+    html+=`<tr><td style="color:var(--muted);font-family:'DM Mono',monospace">${i+1}</td><td>${nombre}</td><td><span style="font-family:'DM Mono',monospace;font-weight:600;color:${cant>0?'var(--green)':'var(--muted)'}">${cant}</span></td></tr>`;
+  });
+  html+='</tbody></table></div>';
+
+  // Dashboard cancelaciones
+  html+=`<div class="section-title" style="margin-bottom:12px">Cancelaciones</div>
+  <div class="op-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="op-card"><div class="op-label">Cancelaciones</div><div class="op-value">${totalCancels}</div></div>
+    <div class="op-card ${totalPenalidad>0?'danger':''}"><div class="op-label">Penalidad total (USD)</div><div class="op-value ${totalPenalidad>0?'danger':''}">$${totalPenalidad.toLocaleString('es-UY',{minimumFractionDigits:0})}</div></div>
+    <div class="op-card"><div class="op-label">Recupero total (USD)</div><div class="op-value c-green">$${totalRecupero.toLocaleString('es-UY',{minimumFractionDigits:0})}</div></div>
+  </div>`;
+
   cont.innerHTML=html;
 }
 function setDashFiltro(f){dashFiltro=f;cargarDashboard()}
