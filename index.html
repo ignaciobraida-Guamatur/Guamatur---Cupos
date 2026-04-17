@@ -431,6 +431,42 @@ let editarVueloId=null,vendedores=[],guardandoVuelo=false;
 async function loginGoogle(){await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:'https://ignaciobraida-guamatur.github.io/Guamatur---Cupos/'}})}
 async function cerrarSesion(){await sb.auth.signOut();window.location.reload()}
 
+// ── AUTH HELPERS: refresh token y retry para proteger contra desfasajes de reloj ──
+async function asegurarTokenFresco(){
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session){console.warn('[Auth] Sin sesión activa');return false;}
+    // Si el token está por expirar en menos de 60 seg, refrescar
+    const ahoraSeg=Math.floor(Date.now()/1000);
+    const expira=session.expires_at||0;
+    if(expira-ahoraSeg<60){
+      console.log('[Auth] Refrescando token...');
+      const {error}=await sb.auth.refreshSession();
+      if(error){console.warn('[Auth] Error al refrescar:',error);return false;}
+    }
+    return true;
+  }catch(e){console.warn('[Auth] Excepción en asegurarTokenFresco:',e);return false;}
+}
+
+// Ejecuta una operación, y si falla con error de auth, refresca token y reintenta una vez
+async function conReintentoAuth(operacion,nombreOp='operación'){
+  let resultado=await operacion();
+  const err=resultado?.error;
+  if(err&&esErrorAuth(err)){
+    console.warn(`[Auth] ${nombreOp} falló por auth, refrescando y reintentando:`,err.message);
+    try{await sb.auth.refreshSession();}catch(e){console.warn('[Auth] refresh falló:',e);}
+    resultado=await operacion();
+  }
+  return resultado;
+}
+
+function esErrorAuth(err){
+  if(!err) return false;
+  const msg=(err.message||'').toLowerCase();
+  const code=err.code||'';
+  return msg.includes('jwt')||msg.includes('token')||msg.includes('expired')||msg.includes('unauthorized')||msg.includes('issued in the future')||code==='401'||code==='PGRST301';
+}
+
 async function iniciarSesion(session){
   currentUser=session.user;
   const {data:u}=await sb.from('usuarios').select('*').eq('email',currentUser.email).maybeSingle();
@@ -840,6 +876,7 @@ async function guardarPasajero(){
   const factura=document.getElementById('p-factura').value.trim();
   if(status==='V'&&!factura){mostrarAlerta('modal-p-alert','Factura obligatoria para status V','error');return;}
   setBtnLoading('btn-guardar-pasajero',true);
+  await asegurarTokenFresco();
   try{
     const datos={
       lugar_id:currentLugarId,vuelo_id:currentVueloId,
@@ -940,18 +977,21 @@ async function confirmarReserva(){
   if(!apellido&&!nombre){mostrarAlerta('modal-r-alert','Ingresá al menos apellido o nombre','error');return;}
   if(cantidad>reservarLugaresLibres){mostrarAlerta('modal-r-alert',`Solo hay ${reservarLugaresLibres} lugares libres`,'error');return;}
   setBtnLoading('btn-confirmar-reserva',true,'Confirmar reserva');
+  await asegurarTokenFresco();
   const idsAReservar=reservarLugaresIds.slice(0,cantidad);
   const ahora=ahoraUY().toISOString();
   const errors=[];
   let exitosos=0;
   const vendedorNombre=vendedores.find(v=>v.email===currentUser.email)?.nombre||currentUser.email;
   for(const lugarId of idsAReservar){
-    const {data:existing,error:errSel}=await sb.from('pasajeros').select('id').eq('lugar_id',lugarId).maybeSingle();
+    const selRes=await conReintentoAuth(()=>sb.from('pasajeros').select('id').eq('lugar_id',lugarId).maybeSingle(),'SELECT pasajero');
+    const existing=selRes?.data;const errSel=selRes?.error;
     if(errSel){console.error('[Reserva] Error SELECT lugar',lugarId,errSel);errors.push(`Lugar ${lugarId.slice(0,8)}: ${errSel.message}`);continue;}
     const datos={lugar_id:lugarId,vuelo_id:reservarVueloId,status:'R',vendedor:vendedorNombre,fecha_reserva:ahora,actualizado_en:ahora,primer_apellido:apellido,primer_nombre:nombre};
-    let err;
-    if(existing){({error:err}=await sb.from('pasajeros').update(datos).eq('id',existing.id));}
-    else{({error:err}=await sb.from('pasajeros').insert(datos));}
+    let insRes;
+    if(existing){insRes=await conReintentoAuth(()=>sb.from('pasajeros').update(datos).eq('id',existing.id),'UPDATE pasajero');}
+    else{insRes=await conReintentoAuth(()=>sb.from('pasajeros').insert(datos),'INSERT pasajero');}
+    const err=insRes?.error;
     if(err){console.error('[Reserva] Error INSERT/UPDATE lugar',lugarId,err);errors.push(`Lugar ${lugarId.slice(0,8)}: ${err.message}`);}
     else{exitosos++;}
   }
@@ -1012,20 +1052,31 @@ async function confirmarCancelacion(){
   });
   if(!seleccionados.length){mostrarAlerta('modal-c-alert','Seleccioná al menos un lugar','error');return;}
   setBtnLoading('btn-confirmar-cancelar',true,'Confirmar cancelación');
+  await asegurarTokenFresco();
   const penalidad=parseFloat(document.getElementById('c-penalidad').value)||0;
   const recupero=parseFloat(document.getElementById('c-recupero').value)||0;
   const errors=[];
+  let exitosos=0;
   for(const l of seleccionados){
     const p=l.pasajeros?.[0];
     if(p?.id){
-      const {error}=await sb.from('pasajeros').update({status:'L',cancelado:true,factura:null,fecha_reserva:null,primer_apellido:null,primer_nombre:null,segundo_apellido:null,segundo_nombre:null,hotel:null,vendedor:null,ficha:null,actualizado_en:new Date().toISOString()}).eq('id',p.id);
-      if(error) errors.push(error.message);
+      const upd=await conReintentoAuth(()=>sb.from('pasajeros').update({status:'L',cancelado:true,factura:null,fecha_reserva:null,primer_apellido:null,primer_nombre:null,segundo_apellido:null,segundo_nombre:null,hotel:null,vendedor:null,ficha:null,actualizado_en:new Date().toISOString()}).eq('id',p.id),'UPDATE cancelar pasajero');
+      if(upd?.error){console.error('[Cancelar] Error update pasajero:',upd.error);errors.push(`Lugar ${l.numero_lugar}: ${upd.error.message}`);continue;}
     }
-    await sb.from('cancelaciones').insert({lugar_id:l.id,vuelo_id:cancelarVueloId,penalidad_usd:penalidad,recupero_usd:recupero,fecha:new Date().toISOString()});
+    const ins=await conReintentoAuth(()=>sb.from('cancelaciones').insert({lugar_id:l.id,vuelo_id:cancelarVueloId,penalidad_usd:penalidad,recupero_usd:recupero,fecha:new Date().toISOString()}),'INSERT cancelación');
+    if(ins?.error){console.error('[Cancelar] Error insert cancelación:',ins.error);errors.push(`Lugar ${l.numero_lugar}: ${ins.error.message}`);continue;}
+    exitosos++;
   }
   setBtnLoading('btn-confirmar-cancelar',false,'Confirmar cancelación');
-  if(errors.length>0){mostrarAlerta('modal-c-alert','Error: '+errors[0],'error');return;}
-  mostrarAlerta('modal-c-alert',`${seleccionados.length} lugar${seleccionados.length>1?'es':''} cancelado${seleccionados.length>1?'s':''} correctamente`,'success');
+  if(errors.length>0){
+    const msg=exitosos>0
+      ?`Se cancelaron ${exitosos} de ${seleccionados.length} lugares. Errores (${errors.length}): ${errors.join(' | ')}`
+      :`No se pudo cancelar. Errores (${errors.length}): ${errors.join(' | ')}`;
+    mostrarAlerta('modal-c-alert',msg,'error');
+    if(exitosos>0)setTimeout(()=>{cerrarModal('modal-cancelar');cargarDetalle(cancelarVueloId)},3500);
+    return;
+  }
+  mostrarAlerta('modal-c-alert',`${exitosos} lugar${exitosos>1?'es':''} cancelado${exitosos>1?'s':''} correctamente`,'success');
   setTimeout(()=>{cerrarModal('modal-cancelar');cargarDetalle(cancelarVueloId)},1000);
 }
 
@@ -1138,6 +1189,7 @@ async function guardarVuelo(){
   if(guardandoVuelo)return;
   guardandoVuelo=true;
   try{
+    await asegurarTokenFresco();
     const nombre=document.getElementById('v-nombre').value.trim();
     const total_lugares=parseInt(document.getElementById('v-lugares').value);
     const ciudadVal=document.getElementById('v-ciudad').value;
