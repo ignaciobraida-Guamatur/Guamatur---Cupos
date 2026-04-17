@@ -442,10 +442,14 @@ async function iniciarSesion(session){
   document.getElementById('rol-badge').style.display='block';
   if(currentRol==='admin'){document.getElementById('nav-admin').style.display='block';document.getElementById('mobile-admin').style.display='block';}
   if(currentRol==='vendedor') document.getElementById('p-status-group').style.display='none';
+  // Vencer reservas expiradas solo al iniciar sesión
+  vencerReservasExpiradas();
   goTo('dashboard');
 }
 
 function toggleMobileMenu(){document.getElementById('mobile-menu').classList.toggle('open')}
+
+let dashCargado=false,vuelosCargado=false,adminCargado=false;
 
 function goTo(s){
   document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
@@ -455,8 +459,8 @@ function goTo(s){
   const links=document.querySelectorAll('.nav-link');
   if(idx[s]!==undefined&&links[idx[s]]) links[idx[s]].classList.add('active');
   if(s==='dashboard') cargarDashboard();
-  if(s==='vuelos') cargarVuelos();
-  if(s==='admin') cargarAdmin();
+  if(s==='vuelos'){vuelosCargado=false;cargarVuelos();}
+  if(s==='admin'){adminCargado=false;cargarAdmin();}
 }
 
 function goToDetalle(id){
@@ -498,7 +502,7 @@ function toggleInfantFields(){
 }
 
 // ── DASHBOARD ────────────────────────────────────
-const alertaOrden={COMPLETO:0,ULTIMOS:1,POCOS:2,DISPONIBLE:3};
+const alertaOrden={DISPONIBLE:0,POCOS:1,ULTIMOS:2,COMPLETO:3};
 
 async function vencerReservasExpiradas(){
   // Traer todas las reservas activas con R sin factura
@@ -537,9 +541,6 @@ async function vencerReservasExpiradas(){
 async function cargarDashboard(){
   const cont=document.getElementById('dashboard-content');
   cont.innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
-
-  // Vencer reservas expiradas antes de cargar
-  await vencerReservasExpiradas();
 
   const [{data:temps},{data:vuelos},{data:pasajerosDash},{data:cancelsDash}]=await Promise.all([
     sb.from('temporadas').select('*').order('creado_en',{ascending:false}),
@@ -912,17 +913,20 @@ async function confirmarCancelacion(){
 
 // ── EXPORTAR EXCEL ───────────────────────────────
 async function exportarExcel(vueloId,nombreVuelo){
-  const {data:lugares}=await sb.from('lugares').select('*,pasajeros(*)').eq('vuelo_id',vueloId).order('numero_lugar');
-  if(!lugares)return;
-  const rows=[['#','Apellido','Nombre','Hotel','Vendedor','Status','Factura','Fecha Reserva','Ficha']];
-  lugares.filter(l=>!l.es_infant).forEach(l=>{
-    const p=l.pasajeros?.[0]||{};
-    rows.push([l.numero_lugar,p.primer_apellido||'',p.primer_nombre||'',p.hotel||'',p.vendedor||'',p.status||'L',p.factura||'',formatFechaHora(p.fecha_reserva),p.ficha||'']);
-  });
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,nombreVuelo.substring(0,31));
-  XLSX.writeFile(wb,`${nombreVuelo}.xlsx`);
+  try{
+    const {data:lugares}=await sb.from('lugares').select('*,pasajeros(*)').eq('vuelo_id',vueloId).order('numero_lugar');
+    if(!lugares||!lugares.length){alert('No hay datos para exportar');return;}
+    const rows=[['#','Apellido','Nombre','Hotel','Vendedor','Status','Factura','Fecha Reserva','Ficha']];
+    lugares.filter(l=>!l.es_infant).forEach(l=>{
+      const p=l.pasajeros?.[0]||{};
+      rows.push([l.numero_lugar,p.primer_apellido||'',p.primer_nombre||'',p.hotel||'',p.vendedor||'',p.status||'L',p.factura||'',formatFechaHora(p.fecha_reserva),p.ficha||'']);
+    });
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    const wb=XLSX.utils.book_new();
+    const sheetName=nombreVuelo.replace(/[\\\/\?\*\[\]]/g,'').substring(0,31);
+    XLSX.utils.book_append_sheet(wb,ws,sheetName);
+    XLSX.writeFile(wb,`${nombreVuelo}.xlsx`);
+  }catch(e){alert('Error al exportar: '+e.message);}
 }
 
 // ── ADMIN ────────────────────────────────────────
