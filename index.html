@@ -404,7 +404,15 @@
 </div>
 
 <script>
-const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqeGR5c21lZ2J6Y3JnYXJjbXd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMjM0MjQsImV4cCI6MjA5MTU5OTQyNH0.q1ikAwWW7PVM80Hpmgv01iIvODdv8fOBco8aATb5tAQ');
+const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqeGR5c21lZ2J6Y3JnYXJjbXd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMjM0MjQsImV4cCI6MjA5MTU5OTQyNH0.q1ikAwWW7PVM80Hpmgv01iIvODdv8fOBco8aATb5tAQ',{
+  auth:{
+    persistSession:true,
+    autoRefreshToken:true,
+    detectSessionInUrl:true,
+    storage:window.localStorage,
+    storageKey:'guamatur-cupos-auth'
+  }
+});
 
 let currentUser=null,currentRol=null,currentVueloId=null,currentPasajeroId=null,currentLugarId=null;
 let temporadas=[],temporadaActiva=null,vuelosData=[],tramosCount=0,dashFiltro='todos';
@@ -782,33 +790,53 @@ async function guardarPasajero(){
   const factura=document.getElementById('p-factura').value.trim();
   if(status==='V'&&!factura){mostrarAlerta('modal-p-alert','Factura obligatoria para status V','error');return;}
   setBtnLoading('btn-guardar-pasajero',true);
-  const datos={
-    lugar_id:currentLugarId,vuelo_id:currentVueloId,
-    primer_apellido:document.getElementById('p-apellido1').value,
-    segundo_apellido:document.getElementById('p-apellido2').value,
-    primer_nombre:document.getElementById('p-nombre1').value,
-    segundo_nombre:document.getElementById('p-nombre2').value,
-    hotel:document.getElementById('p-hotel').value,
-    vendedor:document.getElementById('p-vendedor').value,
-    ficha:document.getElementById('p-ficha').value,
-    status,factura:factura||null,actualizado_en:new Date().toISOString()
-  };
-  if(!currentPasajeroId&&status==='R') datos.fecha_reserva=ahoraUY().toISOString();
-  let pasajeroId=currentPasajeroId,error;
-  if(currentPasajeroId){({error}=await sb.from('pasajeros').update(datos).eq('id',currentPasajeroId));}
-  else{const {data:np,error:e}=await sb.from('pasajeros').insert(datos).select().single();error=e;if(np)pasajeroId=np.id;}  if(error){setBtnLoading('btn-guardar-pasajero',false,'Guardar');mostrarAlerta('modal-p-alert',error.message,'error');return;}
-  const tieneInfant=document.getElementById('p-tiene-infant').checked;
-  if(pasajeroId){
-    if(tieneInfant){
-      const infantData={vuelo_id:currentVueloId,pasajero_id:pasajeroId,primer_apellido:document.getElementById('pi-apellido').value,primer_nombre:document.getElementById('pi-nombre').value};
-      const {data:inf}=await sb.from('infants').select('id').eq('pasajero_id',pasajeroId).maybeSingle();
-      if(inf){await sb.from('infants').update(infantData).eq('id',inf.id);}
-      else{await sb.from('infants').insert(infantData);}
-    } else {await sb.from('infants').delete().eq('pasajero_id',pasajeroId);}
+  try{
+    const datos={
+      lugar_id:currentLugarId,vuelo_id:currentVueloId,
+      primer_apellido:document.getElementById('p-apellido1').value,
+      segundo_apellido:document.getElementById('p-apellido2').value,
+      primer_nombre:document.getElementById('p-nombre1').value,
+      segundo_nombre:document.getElementById('p-nombre2').value,
+      hotel:document.getElementById('p-hotel').value,
+      vendedor:document.getElementById('p-vendedor').value,
+      ficha:document.getElementById('p-ficha').value,
+      status,factura:factura||null,actualizado_en:new Date().toISOString()
+    };
+    if(!currentPasajeroId&&status==='R') datos.fecha_reserva=ahoraUY().toISOString();
+    let pasajeroId=currentPasajeroId,error;
+    if(currentPasajeroId){
+      ({error}=await sb.from('pasajeros').update(datos).eq('id',currentPasajeroId));
+    } else {
+      const {data:np,error:e}=await sb.from('pasajeros').insert(datos).select().single();
+      error=e;if(np)pasajeroId=np.id;
+    }
+    if(error){console.error('[Pasajero] Error guardar:',error);setBtnLoading('btn-guardar-pasajero',false,'Guardar');mostrarAlerta('modal-p-alert','Error al guardar pasajero: '+error.message,'error');return;}
+    const tieneInfant=document.getElementById('p-tiene-infant').checked;
+    if(pasajeroId){
+      if(tieneInfant){
+        const apellidoInf=document.getElementById('pi-apellido').value.trim();
+        const nombreInf=document.getElementById('pi-nombre').value.trim();
+        if(!apellidoInf&&!nombreInf){setBtnLoading('btn-guardar-pasajero',false,'Guardar');mostrarAlerta('modal-p-alert','Completá al menos apellido o nombre del infant','error');return;}
+        const infantData={vuelo_id:currentVueloId,pasajero_id:pasajeroId,primer_apellido:apellidoInf,primer_nombre:nombreInf};
+        const {data:inf,error:errSelInf}=await sb.from('infants').select('id').eq('pasajero_id',pasajeroId).maybeSingle();
+        if(errSelInf){console.error('[Infant] Error SELECT:',errSelInf);setBtnLoading('btn-guardar-pasajero',false,'Guardar');mostrarAlerta('modal-p-alert','Pasajero guardado, pero error al verificar infant: '+errSelInf.message,'error');return;}
+        let errInf;
+        if(inf){({error:errInf}=await sb.from('infants').update(infantData).eq('id',inf.id));}
+        else{({error:errInf}=await sb.from('infants').insert(infantData));}
+        if(errInf){console.error('[Infant] Error guardar:',errInf);setBtnLoading('btn-guardar-pasajero',false,'Guardar');mostrarAlerta('modal-p-alert','Pasajero guardado, pero error al guardar infant: '+errInf.message,'error');return;}
+      } else {
+        const {error:errDel}=await sb.from('infants').delete().eq('pasajero_id',pasajeroId);
+        if(errDel){console.error('[Infant] Error DELETE:',errDel);}
+      }
+    }
+    setBtnLoading('btn-guardar-pasajero',false,'Guardar');
+    mostrarAlerta('modal-p-alert','Guardado correctamente','success');
+    setTimeout(()=>{cerrarModal('modal-pasajero');cargarDetalle(currentVueloId)},800);
+  } catch(err){
+    console.error('[Pasajero] Excepción:',err);
+    setBtnLoading('btn-guardar-pasajero',false,'Guardar');
+    mostrarAlerta('modal-p-alert','Error inesperado: '+(err.message||err),'error');
   }
-  setBtnLoading('btn-guardar-pasajero',false,'Guardar');
-  mostrarAlerta('modal-p-alert','Guardado correctamente','success');
-  setTimeout(()=>{cerrarModal('modal-pasajero');cargarDetalle(currentVueloId)},800);
 }
 
 // ── MODAL RESERVAR ───────────────────────────────
@@ -834,18 +862,27 @@ async function confirmarReserva(){
   const idsAReservar=reservarLugaresIds.slice(0,cantidad);
   const ahora=ahoraUY().toISOString();
   const errors=[];
-  // Obtener nombre del vendedor actual
+  let exitosos=0;
   const vendedorNombre=vendedores.find(v=>v.email===currentUser.email)?.nombre||currentUser.email;
   for(const lugarId of idsAReservar){
-    const {data:existing}=await sb.from('pasajeros').select('id').eq('lugar_id',lugarId).maybeSingle();
+    const {data:existing,error:errSel}=await sb.from('pasajeros').select('id').eq('lugar_id',lugarId).maybeSingle();
+    if(errSel){console.error('[Reserva] Error SELECT lugar',lugarId,errSel);errors.push(`Lugar ${lugarId.slice(0,8)}: ${errSel.message}`);continue;}
     const datos={lugar_id:lugarId,vuelo_id:reservarVueloId,status:'R',vendedor:vendedorNombre,fecha_reserva:ahora,actualizado_en:ahora,primer_apellido:nombre,primer_nombre:'(Reserva grupal)'};
     let err;
     if(existing){({error:err}=await sb.from('pasajeros').update(datos).eq('id',existing.id));}
     else{({error:err}=await sb.from('pasajeros').insert(datos));}
-    if(err)errors.push(err.message);
+    if(err){console.error('[Reserva] Error INSERT/UPDATE lugar',lugarId,err);errors.push(`Lugar ${lugarId.slice(0,8)}: ${err.message}`);}
+    else{exitosos++;}
   }
   setBtnLoading('btn-confirmar-reserva',false,'Confirmar reserva');
-  if(errors.length>0){mostrarAlerta('modal-r-alert','Error: '+errors[0],'error');return;}
+  if(errors.length>0){
+    const msg=exitosos>0
+      ?`Se reservaron ${exitosos} de ${cantidad} lugares. Errores (${errors.length}): ${errors.join(' | ')}`
+      :`No se pudo reservar. Errores (${errors.length}): ${errors.join(' | ')}`;
+    mostrarAlerta('modal-r-alert',msg,'error');
+    if(exitosos>0)setTimeout(()=>{cerrarModal('modal-reservar');cargarDetalle(reservarVueloId)},3500);
+    return;
+  }
   mostrarAlerta('modal-r-alert',`${cantidad} lugar${cantidad>1?'es':''} reservado${cantidad>1?'s':''} correctamente`,'success');
   setTimeout(()=>{cerrarModal('modal-reservar');cargarDetalle(reservarVueloId)},1000);
 }
@@ -1108,7 +1145,8 @@ sb.auth.onAuthStateChange(async(event,session)=>{
 });
 window.onload=async()=>{
   const {data:{session}}=await sb.auth.getSession();
-  if(!session) document.getElementById('screen-login').classList.add('active');
+  if(session){await iniciarSesion(session);}
+  else{document.getElementById('screen-login').classList.add('active');}
 };
 </script>
 </body>
