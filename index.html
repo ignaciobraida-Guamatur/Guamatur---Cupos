@@ -410,7 +410,7 @@ let currentUser=null,currentRol=null,currentVueloId=null,currentPasajeroId=null,
 let temporadas=[],temporadaActiva=null,vuelosData=[],tramosCount=0,dashFiltro='todos';
 let reservarVueloId=null,reservarLugaresLibres=0,reservarLugaresIds=[];
 let cancelarLugarId=null,cancelarPasajeroId=null,cancelarVueloId=null;
-let editarVueloId=null,vendedores=[];
+let editarVueloId=null,vendedores=[],guardandoVuelo=false;
 
 async function loginGoogle(){await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:'https://ignaciobraida-guamatur.github.io/Guamatur---Cupos/'}})}
 async function cerrarSesion(){await sb.auth.signOut();window.location.reload()}
@@ -1007,40 +1007,65 @@ async function abrirModalVuelo(){
 }
 
 async function guardarVuelo(){
-  const nombre=document.getElementById('v-nombre').value.trim();
-  const total_lugares=parseInt(document.getElementById('v-lugares').value);
-  const ciudadVal=document.getElementById('v-ciudad').value;
-  if(!nombre||!ciudadVal){mostrarAlerta('modal-v-alert','Nombre y ciudad son obligatorios','error');return;}
-  setBtnLoading('btn-crear-vuelo',true,editarVueloId?'Guardar cambios':'Crear vuelo');
-  const [ciudad_codigo,ciudad_nombre]=ciudadVal.split('|');
-  const itinerario=obtenerItinerario();
-  const datos={
-    temporada_id:document.getElementById('v-temporada').value,
-    nombre,destino:document.getElementById('v-destino').value||null,
-    ciudad_codigo,ciudad_nombre,
-    aerolinea:document.getElementById('v-aerolinea').value||null,
-    localizador:document.getElementById('v-localizador').value.trim()||null,
-    fecha:document.getElementById('v-fecha').value||null,
-    precio:parseFloat(document.getElementById('v-precio').value)||null,
-    precio_neto:parseFloat(document.getElementById('v-precio-neto').value)||null,
-    condiciones_equipaje:document.getElementById('v-equipaje').value.trim()||null,
-    itinerario:itinerario.length>0?itinerario:null
-  };
-  if(editarVueloId){
-    const {error}=await sb.from('vuelos').update(datos).eq('id',editarVueloId);
-    setBtnLoading('btn-crear-vuelo',false,editarVueloId?'Guardar cambios':'Crear vuelo');
-    if(error){mostrarAlerta('modal-v-alert',error.message,'error');return;}
-    mostrarAlerta('modal-v-alert','Vuelo actualizado','success');
-    setTimeout(()=>{cerrarModal('modal-vuelo');if(currentVueloId===editarVueloId)cargarDetalle(editarVueloId)},1000);
-  } else {
-    if(!total_lugares){mostrarAlerta('modal-v-alert','Total de lugares es obligatorio','error');setBtnLoading('btn-crear-vuelo',false,'Crear vuelo');return;}
-    datos.total_lugares=total_lugares;
-    const {data:vuelo,error}=await sb.from('vuelos').insert(datos).select().single();
-    if(error){setBtnLoading('btn-crear-vuelo',false,'Crear vuelo');mostrarAlerta('modal-v-alert',error.message,'error');return;}
-    await sb.from('lugares').insert(Array.from({length:total_lugares},(_,i)=>({vuelo_id:vuelo.id,numero_lugar:i+1,es_infant:false})));
-    setBtnLoading('btn-crear-vuelo',false,'Crear vuelo');
-    mostrarAlerta('modal-v-alert',`Vuelo creado con ${total_lugares} lugares`,'success');
-    setTimeout(()=>{cerrarModal('modal-vuelo')},1200);
+  if(guardandoVuelo)return;
+  guardandoVuelo=true;
+  try{
+    const nombre=document.getElementById('v-nombre').value.trim();
+    const total_lugares=parseInt(document.getElementById('v-lugares').value);
+    const ciudadVal=document.getElementById('v-ciudad').value;
+    if(!nombre||!ciudadVal){mostrarAlerta('modal-v-alert','Nombre y ciudad son obligatorios','error');return;}
+    setBtnLoading('btn-crear-vuelo',true,editarVueloId?'Guardar cambios':'Crear vuelo');
+    const [ciudad_codigo,ciudad_nombre]=ciudadVal.split('|');
+    const itinerario=obtenerItinerario();
+    const datos={
+      temporada_id:document.getElementById('v-temporada').value,
+      nombre,destino:document.getElementById('v-destino').value||null,
+      ciudad_codigo,ciudad_nombre,
+      aerolinea:document.getElementById('v-aerolinea').value||null,
+      localizador:document.getElementById('v-localizador').value.trim()||null,
+      fecha:document.getElementById('v-fecha').value||null,
+      precio:parseFloat(document.getElementById('v-precio').value)||null,
+      precio_neto:parseFloat(document.getElementById('v-precio-neto').value)||null,
+      condiciones_equipaje:document.getElementById('v-equipaje').value.trim()||null,
+      itinerario:itinerario.length>0?itinerario:null
+    };
+    if(editarVueloId){
+      if(!total_lugares||total_lugares<1){mostrarAlerta('modal-v-alert','Total de lugares es obligatorio','error');setBtnLoading('btn-crear-vuelo',false,'Guardar cambios');return;}
+      const {data:lugaresActuales}=await sb.from('lugares').select('id,numero_lugar,pasajeros(id),cancelaciones(id)').eq('vuelo_id',editarVueloId).eq('es_infant',false).order('numero_lugar');
+      const cantidadActual=(lugaresActuales||[]).length;
+      if(total_lugares>cantidadActual){
+        const maxActual=cantidadActual>0?Math.max(...lugaresActuales.map(l=>l.numero_lugar)):0;
+        const faltantes=total_lugares-cantidadActual;
+        const nuevos=Array.from({length:faltantes},(_,i)=>({vuelo_id:editarVueloId,numero_lugar:maxActual+i+1,es_infant:false}));
+        const {error:errLug}=await sb.from('lugares').insert(nuevos);
+        if(errLug){setBtnLoading('btn-crear-vuelo',false,'Guardar cambios');mostrarAlerta('modal-v-alert','Error al agregar lugares: '+errLug.message,'error');return;}
+      } else if(total_lugares<cantidadActual){
+        const aBorrar=[...lugaresActuales].sort((a,b)=>b.numero_lugar-a.numero_lugar).slice(0,cantidadActual-total_lugares);
+        const ocupado=aBorrar.find(l=>(l.pasajeros&&l.pasajeros.length>0)||(l.cancelaciones&&l.cancelaciones.length>0));
+        if(ocupado){setBtnLoading('btn-crear-vuelo',false,'Guardar cambios');mostrarAlerta('modal-v-alert',`No se puede reducir: el lugar #${ocupado.numero_lugar} tiene pasajero o cancelación. Liberalo primero.`,'error');return;}
+        const idsBorrar=aBorrar.map(l=>l.id);
+        const {error:errDel}=await sb.from('lugares').delete().in('id',idsBorrar);
+        if(errDel){setBtnLoading('btn-crear-vuelo',false,'Guardar cambios');mostrarAlerta('modal-v-alert','Error al reducir lugares: '+errDel.message,'error');return;}
+      }
+      datos.total_lugares=total_lugares;
+      const {error}=await sb.from('vuelos').update(datos).eq('id',editarVueloId);
+      setBtnLoading('btn-crear-vuelo',false,'Guardar cambios');
+      if(error){mostrarAlerta('modal-v-alert',error.message,'error');return;}
+      mostrarAlerta('modal-v-alert','Vuelo actualizado','success');
+      setTimeout(()=>{cerrarModal('modal-vuelo');if(currentVueloId===editarVueloId)cargarDetalle(editarVueloId)},1000);
+    } else {
+      if(!total_lugares){mostrarAlerta('modal-v-alert','Total de lugares es obligatorio','error');setBtnLoading('btn-crear-vuelo',false,'Crear vuelo');return;}
+      datos.total_lugares=total_lugares;
+      const {data:vuelo,error}=await sb.from('vuelos').insert(datos).select().single();
+      if(error){setBtnLoading('btn-crear-vuelo',false,'Crear vuelo');mostrarAlerta('modal-v-alert',error.message,'error');return;}
+      const {error:errLug}=await sb.from('lugares').insert(Array.from({length:total_lugares},(_,i)=>({vuelo_id:vuelo.id,numero_lugar:i+1,es_infant:false})));
+      setBtnLoading('btn-crear-vuelo',false,'Crear vuelo');
+      if(errLug){mostrarAlerta('modal-v-alert','Vuelo creado pero error al crear lugares: '+errLug.message,'error');return;}
+      mostrarAlerta('modal-v-alert',`Vuelo creado con ${total_lugares} lugares`,'success');
+      setTimeout(()=>{cerrarModal('modal-vuelo')},1200);
+    }
+  } finally {
+    guardandoVuelo=false;
   }
 }
 
