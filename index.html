@@ -241,13 +241,14 @@
       <div class="form-group"><label class="form-label">Ficha</label><input class="form-input" id="p-ficha"/></div>
       <div class="form-group" id="p-status-group">
         <label class="form-label">Status</label>
-        <select class="form-select" id="p-status">
+        <select class="form-select" id="p-status" onchange="actualizarHintInfant()">
           <option value="L">L — Libre</option>
           <option value="R">R — Reservado</option>
           <option value="V">V — Vendido</option>
         </select>
       </div>
       <div class="form-group"><label class="form-label">Factura <span style="color:var(--muted)">(req. para V)</span></label><input class="form-input" id="p-factura"/></div>
+      <div class="form-group" id="p-fecha-reserva-group" style="display:none"><label class="form-label">Fecha de reserva <span style="color:var(--muted)">(admin)</span></label><input class="form-input" id="p-fecha-reserva" type="datetime-local"/></div>
     </div>
     <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -257,11 +258,14 @@
         </label>
       </div>
       <div id="infant-fields" style="display:none">
-        <div style="background:rgba(124,111,253,0.08);border:1px solid rgba(124,111,253,0.2);border-radius:8px;padding:10px;font-size:12px;color:var(--accent2);margin-bottom:10px">El INFANT viaja con este pasajero. No ocupa asiento físico.</div>
+        <div style="background:rgba(124,111,253,0.08);border:1px solid rgba(124,111,253,0.2);border-radius:8px;padding:10px;font-size:12px;color:var(--accent2);margin-bottom:10px">El INFANT viaja con este pasajero. No ocupa asiento físico. Hereda hotel, vendedor, ficha y factura del adulto.</div>
         <div class="form-grid">
-          <div class="form-group"><label class="form-label">Apellido INFANT</label><input class="form-input" id="pi-apellido"/></div>
-          <div class="form-group"><label class="form-label">Nombre INFANT</label><input class="form-input" id="pi-nombre"/></div>
+          <div class="form-group"><label class="form-label">Primer apellido INFANT</label><input class="form-input" id="pi-apellido1"/></div>
+          <div class="form-group" id="pi-apellido2-group"><label class="form-label">Segundo apellido INFANT</label><input class="form-input" id="pi-apellido2"/></div>
+          <div class="form-group"><label class="form-label">Primer nombre INFANT</label><input class="form-input" id="pi-nombre1"/></div>
+          <div class="form-group" id="pi-nombre2-group"><label class="form-label">Segundo nombre INFANT</label><input class="form-input" id="pi-nombre2"/></div>
         </div>
+        <div id="pi-hint-v" style="display:none;font-size:11px;color:var(--yellow);margin-top:6px">Para status V son obligatorios los 4 campos del infant.</div>
       </div>
     </div>
     <div class="modal-actions">
@@ -283,7 +287,10 @@
     </div>
     <div class="form-group">
       <label class="form-label">A nombre de</label>
-      <input class="form-input" id="r-nombre" placeholder="Nombre del cliente o grupo"/>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <input class="form-input" id="r-apellido" placeholder="Apellido"/>
+        <input class="form-input" id="r-nombre" placeholder="Nombre"/>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="cerrarModal('modal-reservar')">Cancelar</button>
@@ -385,7 +392,8 @@
         <label class="form-label" style="margin:0">Itinerario de vuelo</label>
         <button type="button" class="btn-sm" onclick="agregarTramo()">+ Agregar tramo</button>
       </div>
-      <div style="display:grid;grid-template-columns:90px 80px 60px 60px 65px 65px 30px;gap:6px;margin-bottom:6px">
+      <div style="display:grid;grid-template-columns:70px 90px 80px 60px 60px 65px 65px 30px;gap:6px;margin-bottom:6px">
+        <span style="font-size:10px;color:var(--muted);text-transform:uppercase">Tipo</span>
         <span style="font-size:10px;color:var(--muted);text-transform:uppercase">Fecha</span>
         <span style="font-size:10px;color:var(--muted);text-transform:uppercase">Vuelo</span>
         <span style="font-size:10px;color:var(--muted);text-transform:uppercase">Origen</span>
@@ -507,6 +515,7 @@ function setBtnLoading(id,loading,texto='Guardar'){
 }
 function toggleInfantFields(){
   document.getElementById('infant-fields').style.display=document.getElementById('p-tiene-infant').checked?'block':'none';
+  actualizarHintInfant();
 }
 
 // ── DASHBOARD ────────────────────────────────────
@@ -717,8 +726,8 @@ async function cargarDetalle(vueloId){
 
   if(vuelo.itinerario&&vuelo.itinerario.length>0){
     html+=`<div class="itinerario-wrap"><div class="itinerario-title">✈ Itinerario de vuelo</div>
-    <table class="itinerario-table"><thead><tr><th>Fecha</th><th>Vuelo</th><th>Origen</th><th>Destino</th><th>Salida</th><th>Llegada</th></tr></thead><tbody>`;
-    vuelo.itinerario.forEach(t=>{html+=`<tr><td>${t.fecha||'—'}</td><td>${t.vuelo||'—'}</td><td>${t.origen||'—'}</td><td>${t.destino||'—'}</td><td>${t.salida||'—'}</td><td>${t.llegada||'—'}</td></tr>`;});
+    <table class="itinerario-table"><thead><tr><th>Tipo</th><th>Fecha</th><th>Vuelo</th><th>Origen</th><th>Destino</th><th>Salida</th><th>Llegada</th></tr></thead><tbody>`;
+    vuelo.itinerario.forEach(t=>{const tipo=t.tipo||'Ida';const badgeCls=tipo==='Vuelta'?'badge-orange':'badge-green';html+=`<tr><td><span class="badge ${badgeCls}">${tipo}</span></td><td>${t.fecha||'—'}</td><td>${t.vuelo||'—'}</td><td>${t.origen||'—'}</td><td>${t.destino||'—'}</td><td>${t.salida||'—'}</td><td>${t.llegada||'—'}</td></tr>`;});
     html+='</tbody></table></div>';
   }
 
@@ -745,7 +754,7 @@ async function cargarDetalle(vueloId){
       </td>`:''}
     </tr>`;
     if(inf){
-      html+=`<tr class="row-infant"><td style="color:var(--muted);font-size:11px;padding-left:20px">↳</td><td colspan="${esAdmin?8:7}"><span class="badge badge-infant">INFANT</span> ${inf.primer_nombre||''} ${inf.primer_apellido||''}</td>${esAdmin?'<td></td><td></td>':''}</tr>`;
+      html+=`<tr class="row-infant"><td style="color:var(--muted);font-size:11px;padding-left:20px">↳</td><td colspan="${esAdmin?8:7}"><span class="badge badge-infant">INFANT</span> ${[inf.primer_apellido,inf.segundo_apellido].filter(Boolean).join(' ')||''} ${[inf.primer_nombre,inf.segundo_nombre].filter(Boolean).join(' ')||''}</td>${esAdmin?'<td></td><td></td>':''}</tr>`;
     }
   });
   html+='</tbody></table></div>';
@@ -765,6 +774,14 @@ function abrirModalPasajero(lugarId,pasajero,vueloId,infant=null){
   document.getElementById('p-ficha').value=esLibre?'':(pasajero.ficha||'');
   document.getElementById('p-status').value=esLibre?'L':(pasajero.status||'L');
   document.getElementById('p-factura').value=esLibre?'':(pasajero.factura||'');
+  // Fecha de reserva (solo admin la ve y edita)
+  const fechaResGroup=document.getElementById('p-fecha-reserva-group');
+  if(currentRol==='admin'){
+    fechaResGroup.style.display='';
+    document.getElementById('p-fecha-reserva').value=(!esLibre&&pasajero.fecha_reserva)?toDatetimeLocal(pasajero.fecha_reserva):'';
+  } else {
+    fechaResGroup.style.display='none';
+  }
   const vendedorEl=document.getElementById('p-vendedor');
   if(currentRol==='admin'){
     vendedorEl.disabled=false;
@@ -776,13 +793,41 @@ function abrirModalPasajero(lugarId,pasajero,vueloId,infant=null){
   }
   const tieneInfant=infant!==null&&!esLibre;
   document.getElementById('p-tiene-infant').checked=tieneInfant;
-  document.getElementById('pi-apellido').value=infant?.primer_apellido||'';
-  document.getElementById('pi-nombre').value=infant?.primer_nombre||'';
+  document.getElementById('pi-apellido1').value=infant?.primer_apellido||'';
+  document.getElementById('pi-apellido2').value=infant?.segundo_apellido||'';
+  document.getElementById('pi-nombre1').value=infant?.primer_nombre||'';
+  document.getElementById('pi-nombre2').value=infant?.segundo_nombre||'';
   document.getElementById('infant-fields').style.display=tieneInfant?'block':'none';
+  actualizarHintInfant();
   document.getElementById('modal-p-alert').innerHTML='';
   document.getElementById('btn-guardar-pasajero').disabled=false;
   document.getElementById('btn-guardar-pasajero').textContent='Guardar';
   document.getElementById('modal-pasajero').style.display='flex';
+}
+
+function actualizarHintInfant(){
+  const status=document.getElementById('p-status')?.value;
+  const hint=document.getElementById('pi-hint-v');
+  if(hint) hint.style.display=(status==='V'&&document.getElementById('p-tiene-infant').checked)?'block':'none';
+}
+
+function toDatetimeLocal(iso){
+  if(!iso) return '';
+  const d=new Date(iso);
+  // Convertir UTC a hora UY (UTC-3) para mostrar en input datetime-local
+  const uy=new Date(d.getTime()-3*60*60*1000);
+  const pad=n=>String(n).padStart(2,'0');
+  return `${uy.getUTCFullYear()}-${pad(uy.getUTCMonth()+1)}-${pad(uy.getUTCDate())}T${pad(uy.getUTCHours())}:${pad(uy.getUTCMinutes())}`;
+}
+
+function fromDatetimeLocal(val){
+  if(!val) return null;
+  const [fecha,hora]=val.split('T');
+  const [y,m,d]=fecha.split('-').map(Number);
+  const [hh,mm]=hora.split(':').map(Number);
+  // Input es hora UY (UTC-3) → convertir a UTC sumando 3 horas
+  const utc=new Date(Date.UTC(y,m-1,d,hh+3,mm,0));
+  return utc.toISOString();
 }
 
 async function guardarPasajero(){
@@ -802,7 +847,21 @@ async function guardarPasajero(){
       ficha:document.getElementById('p-ficha').value,
       status,factura:factura||null,actualizado_en:new Date().toISOString()
     };
-    if(!currentPasajeroId&&status==='R') datos.fecha_reserva=ahoraUY().toISOString();
+    // Fecha de reserva: admin puede editarla; si no, se setea automáticamente al crear una R
+    if(currentRol==='admin'){
+      const fechaManual=document.getElementById('p-fecha-reserva').value;
+      if(fechaManual){
+        datos.fecha_reserva=fromDatetimeLocal(fechaManual);
+      } else if(!currentPasajeroId&&status==='R'){
+        datos.fecha_reserva=ahoraUY().toISOString();
+      } else if(!currentPasajeroId){
+        datos.fecha_reserva=null;
+      }
+      // Si es edición y el admin borró el campo, dejar null
+      if(currentPasajeroId&&!fechaManual) datos.fecha_reserva=null;
+    } else {
+      if(!currentPasajeroId&&status==='R') datos.fecha_reserva=ahoraUY().toISOString();
+    }
     let pasajeroId=currentPasajeroId,error;
     if(currentPasajeroId){
       ({error}=await sb.from('pasajeros').update(datos).eq('id',currentPasajeroId));
@@ -814,10 +873,25 @@ async function guardarPasajero(){
     const tieneInfant=document.getElementById('p-tiene-infant').checked;
     if(pasajeroId){
       if(tieneInfant){
-        const apellidoInf=document.getElementById('pi-apellido').value.trim();
-        const nombreInf=document.getElementById('pi-nombre').value.trim();
-        if(!apellidoInf&&!nombreInf){setBtnLoading('btn-guardar-pasajero',false,'Guardar');mostrarAlerta('modal-p-alert','Completá al menos apellido o nombre del infant','error');return;}
-        const infantData={vuelo_id:currentVueloId,pasajero_id:pasajeroId,primer_apellido:apellidoInf,primer_nombre:nombreInf};
+        const apellido1Inf=document.getElementById('pi-apellido1').value.trim();
+        const apellido2Inf=document.getElementById('pi-apellido2').value.trim();
+        const nombre1Inf=document.getElementById('pi-nombre1').value.trim();
+        const nombre2Inf=document.getElementById('pi-nombre2').value.trim();
+        // Validación según status: V exige los 4 campos; R/L alcanza con primer apellido o nombre
+        if(status==='V'){
+          if(!apellido1Inf||!apellido2Inf||!nombre1Inf||!nombre2Inf){
+            setBtnLoading('btn-guardar-pasajero',false,'Guardar');
+            mostrarAlerta('modal-p-alert','Para status V, el INFANT requiere los 4 campos (ambos apellidos y nombres)','error');
+            return;
+          }
+        } else {
+          if(!apellido1Inf&&!nombre1Inf){
+            setBtnLoading('btn-guardar-pasajero',false,'Guardar');
+            mostrarAlerta('modal-p-alert','Completá al menos primer apellido o primer nombre del infant','error');
+            return;
+          }
+        }
+        const infantData={vuelo_id:currentVueloId,pasajero_id:pasajeroId,primer_apellido:apellido1Inf,segundo_apellido:apellido2Inf||null,primer_nombre:nombre1Inf,segundo_nombre:nombre2Inf||null};
         const {data:inf,error:errSelInf}=await sb.from('infants').select('id').eq('pasajero_id',pasajeroId).maybeSingle();
         if(errSelInf){console.error('[Infant] Error SELECT:',errSelInf);setBtnLoading('btn-guardar-pasajero',false,'Guardar');mostrarAlerta('modal-p-alert','Pasajero guardado, pero error al verificar infant: '+errSelInf.message,'error');return;}
         let errInf;
@@ -844,6 +918,7 @@ function abrirModalReservar(vueloId,libres,idsStr){
   reservarVueloId=vueloId;reservarLugaresLibres=parseInt(libres);
   reservarLugaresIds=idsStr?idsStr.split(',').filter(x=>x):[];
   document.getElementById('r-cantidad').value='';
+  document.getElementById('r-apellido').value='';
   document.getElementById('r-nombre').value='';
   document.getElementById('r-libres-label').textContent=`(${libres} disponibles)`;
   document.getElementById('modal-r-alert').innerHTML='';
@@ -854,9 +929,10 @@ function abrirModalReservar(vueloId,libres,idsStr){
 
 async function confirmarReserva(){
   const cantidad=parseInt(document.getElementById('r-cantidad').value);
+  const apellido=document.getElementById('r-apellido').value.trim();
   const nombre=document.getElementById('r-nombre').value.trim();
   if(!cantidad||cantidad<1){mostrarAlerta('modal-r-alert','Ingresá una cantidad válida','error');return;}
-  if(!nombre){mostrarAlerta('modal-r-alert','Ingresá el nombre del cliente o grupo','error');return;}
+  if(!apellido&&!nombre){mostrarAlerta('modal-r-alert','Ingresá al menos apellido o nombre','error');return;}
   if(cantidad>reservarLugaresLibres){mostrarAlerta('modal-r-alert',`Solo hay ${reservarLugaresLibres} lugares libres`,'error');return;}
   setBtnLoading('btn-confirmar-reserva',true,'Confirmar reserva');
   const idsAReservar=reservarLugaresIds.slice(0,cantidad);
@@ -867,7 +943,7 @@ async function confirmarReserva(){
   for(const lugarId of idsAReservar){
     const {data:existing,error:errSel}=await sb.from('pasajeros').select('id').eq('lugar_id',lugarId).maybeSingle();
     if(errSel){console.error('[Reserva] Error SELECT lugar',lugarId,errSel);errors.push(`Lugar ${lugarId.slice(0,8)}: ${errSel.message}`);continue;}
-    const datos={lugar_id:lugarId,vuelo_id:reservarVueloId,status:'R',vendedor:vendedorNombre,fecha_reserva:ahora,actualizado_en:ahora,primer_apellido:nombre,primer_nombre:'(Reserva grupal)'};
+    const datos={lugar_id:lugarId,vuelo_id:reservarVueloId,status:'R',vendedor:vendedorNombre,fecha_reserva:ahora,actualizado_en:ahora,primer_apellido:apellido,primer_nombre:nombre};
     let err;
     if(existing){({error:err}=await sb.from('pasajeros').update(datos).eq('id',existing.id));}
     else{({error:err}=await sb.from('pasajeros').insert(datos));}
@@ -951,12 +1027,22 @@ async function confirmarCancelacion(){
 // ── EXPORTAR EXCEL ───────────────────────────────
 async function exportarExcel(vueloId,nombreVuelo){
   try{
-    const {data:lugares}=await sb.from('lugares').select('*,pasajeros(*)').eq('vuelo_id',vueloId).order('numero_lugar');
+    const [{data:lugares},{data:infants}]=await Promise.all([
+      sb.from('lugares').select('*,pasajeros(*)').eq('vuelo_id',vueloId).order('numero_lugar'),
+      sb.from('infants').select('*').eq('vuelo_id',vueloId)
+    ]);
     if(!lugares||!lugares.length){alert('No hay datos para exportar');return;}
-    const rows=[['#','Apellido','Nombre','Hotel','Vendedor','Status','Factura','Fecha Reserva','Ficha']];
+    const infantMap={};
+    (infants||[]).forEach(inf=>{if(inf.pasajero_id)infantMap[inf.pasajero_id]=inf});
+    const rows=[['#','Tipo','Primer Apellido','Segundo Apellido','Primer Nombre','Segundo Nombre','Hotel','Vendedor','Status','Factura','Fecha Reserva','Ficha']];
     lugares.filter(l=>!l.es_infant).forEach(l=>{
       const p=l.pasajeros?.[0]||{};
-      rows.push([l.numero_lugar,p.primer_apellido||'',p.primer_nombre||'',p.hotel||'',p.vendedor||'',p.status||'L',p.factura||'',formatFechaHora(p.fecha_reserva),p.ficha||'']);
+      rows.push([l.numero_lugar,'Adulto',p.primer_apellido||'',p.segundo_apellido||'',p.primer_nombre||'',p.segundo_nombre||'',p.hotel||'',p.vendedor||'',p.status||'L',p.factura||'',formatFechaHora(p.fecha_reserva),p.ficha||'']);
+      const inf=p.id?infantMap[p.id]:null;
+      if(inf){
+        // Infant hereda hotel/vendedor/ficha/factura/status/fecha del adulto
+        rows.push([`${l.numero_lugar}.inf`,'Infant',inf.primer_apellido||'',inf.segundo_apellido||'',inf.primer_nombre||'',inf.segundo_nombre||'',p.hotel||'',p.vendedor||'',p.status||'L',p.factura||'',formatFechaHora(p.fecha_reserva),p.ficha||'']);
+      }
     });
     const ws=XLSX.utils.aoa_to_sheet(rows);
     const wb=XLSX.utils.book_new();
@@ -1020,7 +1106,7 @@ async function abrirEditarVuelo(vueloId){
       document.getElementById('v-equipaje').value=v.condiciones_equipaje||'';
       document.getElementById('tramos-wrap').innerHTML='';
       tramosCount=0;
-      if(v.itinerario){v.itinerario.forEach(t=>{agregarTramo();const i=tramosCount-1;document.getElementById(`t-f-${i}`).value=t.fecha||'';document.getElementById(`t-v-${i}`).value=t.vuelo||'';document.getElementById(`t-o-${i}`).value=t.origen||'';document.getElementById(`t-d-${i}`).value=t.destino||'';document.getElementById(`t-s-${i}`).value=t.salida||'';document.getElementById(`t-l-${i}`).value=t.llegada||'';});}
+      if(v.itinerario){v.itinerario.forEach(t=>{agregarTramo();const i=tramosCount-1;const selTipo=document.getElementById(`t-t-${i}`);if(selTipo)selTipo.value=t.tipo||'Ida';document.getElementById(`t-f-${i}`).value=t.fecha||'';document.getElementById(`t-v-${i}`).value=t.vuelo||'';document.getElementById(`t-o-${i}`).value=t.origen||'';document.getElementById(`t-d-${i}`).value=t.destino||'';document.getElementById(`t-s-${i}`).value=t.salida||'';document.getElementById(`t-l-${i}`).value=t.llegada||'';});}
     }
   }
   document.getElementById('modal-v-alert').innerHTML='';
@@ -1112,8 +1198,9 @@ function agregarTramo(){
   const i=tramosCount++;
   const div=document.createElement('div');
   div.id=`tramo-${i}`;
-  div.style.cssText='display:grid;grid-template-columns:90px 80px 60px 60px 65px 65px 30px;gap:6px;margin-bottom:6px;align-items:center';
-  div.innerHTML=`<input class="form-input" placeholder="28 mar" id="t-f-${i}" style="padding:5px 8px;font-size:12px"/>
+  div.style.cssText='display:grid;grid-template-columns:70px 90px 80px 60px 60px 65px 65px 30px;gap:6px;margin-bottom:6px;align-items:center';
+  div.innerHTML=`<select class="form-select" id="t-t-${i}" style="padding:5px 8px;font-size:12px"><option value="Ida">Ida</option><option value="Vuelta">Vuelta</option></select>
+    <input class="form-input" placeholder="28 mar" id="t-f-${i}" style="padding:5px 8px;font-size:12px"/>
     <input class="form-input" placeholder="LA 2421" id="t-v-${i}" style="padding:5px 8px;font-size:12px"/>
     <input class="form-input" placeholder="MVD" id="t-o-${i}" style="padding:5px 8px;font-size:12px"/>
     <input class="form-input" placeholder="LIM" id="t-d-${i}" style="padding:5px 8px;font-size:12px"/>
@@ -1128,7 +1215,7 @@ function obtenerItinerario(){
   document.querySelectorAll('[id^="tramo-"]').forEach(div=>{
     const i=div.id.split('-')[1];
     const f=document.getElementById(`t-f-${i}`)?.value;
-    if(f)tramos.push({fecha:f,vuelo:document.getElementById(`t-v-${i}`)?.value||'',origen:document.getElementById(`t-o-${i}`)?.value||'',destino:document.getElementById(`t-d-${i}`)?.value||'',salida:document.getElementById(`t-s-${i}`)?.value||'',llegada:document.getElementById(`t-l-${i}`)?.value||''});
+    if(f)tramos.push({tipo:document.getElementById(`t-t-${i}`)?.value||'Ida',fecha:f,vuelo:document.getElementById(`t-v-${i}`)?.value||'',origen:document.getElementById(`t-o-${i}`)?.value||'',destino:document.getElementById(`t-d-${i}`)?.value||'',salida:document.getElementById(`t-s-${i}`)?.value||'',llegada:document.getElementById(`t-l-${i}`)?.value||''});
   });
   return tramos;
 }
