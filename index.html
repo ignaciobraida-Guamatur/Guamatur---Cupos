@@ -731,7 +731,7 @@ async function cargarDetalle(vueloId){
     html+='</tbody></table></div>';
   }
 
-  html+=`<div class="table-wrap"><table><thead><tr><th>#</th><th>Apellido</th><th>Nombre</th><th>Hotel</th><th>Vendedor</th><th>Status</th><th>Factura</th><th>Fecha reserva</th><th>Vencimiento</th>${esAdmin?'<th>Ficha</th><th></th>':''}</tr></thead><tbody>`;
+  html+=`<div class="table-wrap"><table><thead><tr><th>#</th><th>Primer apellido</th><th>Segundo apellido</th><th>Primer nombre</th><th>Segundo nombre</th><th>Hotel</th><th>Vendedor</th><th>Status</th><th>Factura</th><th>Fecha reserva</th><th>Vencimiento</th>${esAdmin?'<th>Ficha</th><th></th>':''}</tr></thead><tbody>`;
   lugaresAdultos.forEach(l=>{
     const p=l.pasajeros?.[0];
     const st=p?.status||'L';
@@ -742,7 +742,10 @@ async function cargarDetalle(vueloId){
     const rowCls=cancelado?'row-cancelado':st==='V'?'row-v':st==='R'?'row-r':'';
     html+=`<tr class="${rowCls}">
       <td style="font-family:'DM Mono',monospace;font-weight:500">${l.numero_lugar}</td>
-      <td>${p?.primer_apellido||'—'}</td><td>${p?.primer_nombre||'—'}</td>
+      <td>${p?.primer_apellido||'—'}</td>
+      <td>${p?.segundo_apellido||'—'}</td>
+      <td>${p?.primer_nombre||'—'}</td>
+      <td>${p?.segundo_nombre||'—'}</td>
       <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p?.hotel||'—'}</td>
       <td>${p?.vendedor||'—'}</td>
       <td>${cancelado?'<span class="badge badge-yellow">CANCEL</span>':`<span class="badge badge-${st==='V'?'v':st==='R'?'r':'l'}">${st}</span>`}</td>
@@ -754,7 +757,9 @@ async function cargarDetalle(vueloId){
       </td>`:''}
     </tr>`;
     if(inf){
-      html+=`<tr class="row-infant"><td style="color:var(--muted);font-size:11px;padding-left:20px">↳</td><td colspan="${esAdmin?8:7}"><span class="badge badge-infant">INFANT</span> ${[inf.primer_apellido,inf.segundo_apellido].filter(Boolean).join(' ')||''} ${[inf.primer_nombre,inf.segundo_nombre].filter(Boolean).join(' ')||''}</td>${esAdmin?'<td></td><td></td>':''}</tr>`;
+      const apellidoInf=[inf.primer_apellido,inf.segundo_apellido].filter(Boolean).join(' ');
+      const nombreInf=[inf.primer_nombre,inf.segundo_nombre].filter(Boolean).join(' ');
+      html+=`<tr class="row-infant"><td style="color:var(--muted);font-size:11px;padding-left:20px">↳</td><td colspan="${esAdmin?12:10}"><span class="badge badge-infant">INFANT</span> ${apellidoInf} ${nombreInf}</td></tr>`;
     }
   });
   html+='</tbody></table></div>';
