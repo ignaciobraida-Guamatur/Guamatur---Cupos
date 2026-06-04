@@ -150,7 +150,7 @@
   <div class="nav-brand"><div class="nav-brand-icon">✈</div>Cupos Aéreos</div>
   <div class="nav-links" id="nav-links" style="display:none">
     <button class="nav-link active" onclick="goTo('dashboard')">Dashboard</button>
-    <button class="nav-link" onclick="goTo('vuelos')">Vuelos</button>
+    <button class="nav-link" onclick="goTo('vuelos')">Cupos</button>
     <button class="nav-link" id="nav-admin" style="display:none" onclick="goTo('admin')">Administración</button>
   </div>
   <div class="nav-right">
@@ -166,7 +166,7 @@
 <div class="mobile-menu" id="mobile-menu" onclick="toggleMobileMenu()">
   <div class="mobile-menu-inner" onclick="event.stopPropagation()">
     <button class="mobile-menu-btn" onclick="goTo('dashboard');toggleMobileMenu()">📊 Dashboard</button>
-    <button class="mobile-menu-btn" onclick="goTo('vuelos');toggleMobileMenu()">✈ Vuelos</button>
+    <button class="mobile-menu-btn" onclick="goTo('vuelos');toggleMobileMenu()">✈ Cupos</button>
     <button class="mobile-menu-btn" id="mobile-admin" style="display:none" onclick="goTo('admin');toggleMobileMenu()">⚙️ Administración</button>
     <button class="mobile-menu-btn" onclick="cerrarSesion()" style="color:var(--red)">Cerrar sesión</button>
   </div>
@@ -196,10 +196,10 @@
 <div id="screen-vuelos" class="screen">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap">
     <div style="flex:1">
-      <div style="font-size:18px;font-weight:600;margin-bottom:10px">Vuelos</div>
+      <div style="font-size:18px;font-weight:600;margin-bottom:10px">Cupos</div>
       <div id="temp-selector-wrap" class="temp-selector"></div>
     </div>
-    <input class="search-input" type="text" placeholder="Buscar vuelo..." oninput="filtrarVuelos(this.value)"/>
+    <input class="search-input" type="text" placeholder="Buscar cupo..." oninput="filtrarVuelos(this.value)"/>
   </div>
   <div id="vuelos-content"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
 </div>
@@ -217,8 +217,8 @@
       <button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="abrirModalTemporada()">+ Nueva temporada</button>
     </div>
     <div class="admin-card">
-      <div class="admin-card-title">Vuelos</div>
-      <button class="btn btn-primary" style="width:100%" onclick="abrirModalVuelo()">+ Nuevo vuelo</button>
+      <div class="admin-card-title">Cupos</div>
+      <button class="btn btn-primary" style="width:100%" onclick="abrirModalVuelo()">+ Nuevo cupo</button>
       <div id="admin-vuelos" style="margin-top:12px"></div>
     </div>
     <div class="admin-card">
@@ -315,7 +315,7 @@
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <span style="font-size:12px;color:var(--muted)">Seleccioná los lugares a cancelar</span>
-      <button class="btn-sm" onclick="seleccionarTodosLugares()">Cancelar vuelo completo</button>
+      <button class="btn-sm" onclick="seleccionarTodosLugares()">Cancelar cupo completo</button>
     </div>
     <div id="c-lugares-lista" style="max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:14px"></div>
     <div class="form-grid">
@@ -374,13 +374,13 @@
 <!-- MODAL VUELO -->
 <div id="modal-vuelo" class="modal-overlay" style="display:none">
   <div class="modal" style="max-width:600px">
-    <div class="modal-title" id="modal-vuelo-title">Nuevo vuelo</div>
+    <div class="modal-title" id="modal-vuelo-title">Nuevo cupo</div>
     <div id="modal-v-alert"></div>
     <div class="form-grid">
       <div class="form-group full"><label class="form-label">Temporada</label><select class="form-select" id="v-temporada"></select></div>
       <div class="form-group">
-        <label class="form-label">Destino</label>
-        <select class="form-select" id="v-destino"><option value="">Seleccionar...</option><option value="Brasil">Brasil</option><option value="Caribe">Caribe</option></select>
+        <label class="form-label">Región</label>
+        <select class="form-select" id="v-destino"><option value="">Seleccionar...</option><option value="Brasil">Brasil</option><option value="Caribe">Caribe</option><option value="Chile">Chile</option></select>
       </div>
       <div class="form-group">
         <label class="form-label">Ciudad</label>
@@ -394,7 +394,7 @@
           <option value="BOG|BOGOTÁ">BOGOTÁ</option><option value="MIA|MIAMI">MIAMI</option>
         </select>
       </div>
-      <div class="form-group full"><label class="form-label">Nombre del vuelo</label><input class="form-input" id="v-nombre" placeholder="Ej: CUN LA 2703"/></div>
+      <div class="form-group full"><label class="form-label">Nombre del cupo</label><input class="form-input" id="v-nombre" placeholder="Ej: CUN LA 2703"/></div>
       <div class="form-group">
         <label class="form-label">Aerolínea</label>
         <select class="form-select" id="v-aerolinea">
@@ -414,7 +414,7 @@
     </div>
     <div style="margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <label class="form-label" style="margin:0">Itinerario de vuelo</label>
+        <label class="form-label" style="margin:0">Itinerario del cupo</label>
         <button type="button" class="btn-sm" onclick="agregarTramo()">+ Agregar tramo</button>
       </div>
       <div style="display:grid;grid-template-columns:70px 90px 80px 60px 60px 65px 65px 30px;gap:6px;margin-bottom:6px">
@@ -431,7 +431,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="cerrarModal('modal-vuelo')">Cancelar</button>
-      <button class="btn btn-primary" id="btn-crear-vuelo" onclick="guardarVuelo()">Crear vuelo</button>
+      <button class="btn btn-primary" id="btn-crear-vuelo" onclick="guardarVuelo()">Crear cupo</button>
     </div>
   </div>
 </div>
@@ -678,8 +678,8 @@ async function cargarDashboard(){
     <div class="kpi-card"><div class="kpi-label">% Ocupación</div><div class="kpi-value c-purple">${total>0?Math.round(vendidos/total*100):0}%</div></div>
   </div>
 
-  <div class="section-title" style="margin-bottom:12px">Análisis por destino</div>
-  <div class="table-wrap"><table><thead><tr><th>Vuelo</th><th>Destino</th><th>Total</th><th>Vendidos</th><th>Reservados</th><th>Libres</th><th>Ocup.</th><th>Alerta</th></tr></thead><tbody>`;
+  <div class="section-title" style="margin-bottom:12px">Análisis por región</div>
+  <div class="table-wrap"><table><thead><tr><th>Cupo</th><th>Región</th><th>Total</th><th>Vendidos</th><th>Reservados</th><th>Libres</th><th>Ocup.</th><th>Alerta</th></tr></thead><tbody>`;
   filas.forEach(d=>{html+=`<tr style="cursor:pointer" onclick="goToDetalle('${d.id}')"><td style="color:var(--accent2);font-weight:500">${d.nombre}</td><td><span class="badge badge-${d.destino==='Brasil'?'green':'orange'}">${d.destino||'—'}</span></td><td>${d.total}</td><td>${d.vendidos}</td><td>${d.reservados}</td><td>${d.libres}</td><td>${d.pct}%</td><td><span class="badge ${d.cls}">${d.txt}</span></td></tr>`;});
   html+='</tbody></table></div>';
 
@@ -718,12 +718,12 @@ async function cargarVuelos(){
 function seleccionarTemporada(id){temporadaActiva=id;cargarVuelos()}
 function renderVuelos(lista){
   const cont=document.getElementById('vuelos-content');
-  if(!lista.length){cont.innerHTML='<div class="loading">No hay vuelos en esta temporada</div>';return;}
+  if(!lista.length){cont.innerHTML='<div class="loading">No hay cupos en esta temporada</div>';return;}
   const grupos={};
   lista.forEach(v=>{const d=v.destino||'Sin destino';if(!grupos[d])grupos[d]=[];grupos[d].push(v)});
   let html='';
   Object.entries(grupos).forEach(([destino,vuelos])=>{
-    html+=`<div class="destino-header">${destino} <span>${vuelos.length} vuelo${vuelos.length!==1?'s':''}</span></div>`;
+    html+=`<div class="destino-header">${destino} <span>${vuelos.length} cupo${vuelos.length!==1?'s':''}</span></div>`;
     vuelos.forEach(v=>{
       const vV=v.vendidos||0,rV=v.reservados||0,lV=v.libres||0;
       const [cls,txt]=alertaMap[calcularAlerta(lV)];
@@ -782,7 +782,7 @@ async function cargarDetalle(vueloId){
       <button class="btn btn-outline" onclick="goTo('vuelos')">← Volver</button>
       <button class="btn btn-success" onclick="abrirModalReservar('${vueloId}',${lV},'${idsLibres.join(',')}')">+ Reservar lugares</button>
       <button class="btn btn-excel" onclick="exportarExcel('${vueloId}','${vuelo.nombre}')">⬇ Excel</button>
-      ${esAdmin?`<button class="btn btn-warning" onclick="abrirModalCancelar('${vueloId}')">⚠ Cancelar lugares</button><button class="btn btn-outline" onclick="abrirEditarVuelo('${vueloId}')">✏ Editar vuelo</button>`:''}
+      ${esAdmin?`<button class="btn btn-warning" onclick="abrirModalCancelar('${vueloId}')">⚠ Cancelar lugares</button><button class="btn btn-outline" onclick="abrirEditarVuelo('${vueloId}')">✏ Editar cupo</button>`:''}
     </div>
   </div>`;
 
@@ -794,7 +794,7 @@ async function cargarDetalle(vueloId){
   </div>`;
 
   if(vuelo.itinerario&&vuelo.itinerario.length>0){
-    html+=`<div class="itinerario-wrap"><div class="itinerario-title">✈ Itinerario de vuelo</div>
+    html+=`<div class="itinerario-wrap"><div class="itinerario-title">✈ Itinerario del cupo</div>
     <table class="itinerario-table"><thead><tr><th>Tipo</th><th>Fecha</th><th>Vuelo</th><th>Origen</th><th>Destino</th><th>Salida</th><th>Llegada</th></tr></thead><tbody>`;
     vuelo.itinerario.forEach(t=>{const tipo=t.tipo||'Ida';const badgeCls=tipo==='Vuelta'?'badge-orange':'badge-green';html+=`<tr><td><span class="badge ${badgeCls}">${tipo}</span></td><td>${t.fecha||'—'}</td><td>${t.vuelo||'—'}</td><td>${t.origen||'—'}</td><td>${t.destino||'—'}</td><td>${t.salida||'—'}</td><td>${t.llegada||'—'}</td></tr>`;});
     html+='</tbody></table></div>';
@@ -1238,7 +1238,7 @@ async function abrirEditarVuelo(vueloId){
   if(vueloId){
     const {data:v}=await sb.from('vuelos').select('*').eq('id',vueloId).single();
     if(v){
-      document.getElementById('modal-vuelo-title').textContent='Editar vuelo';
+      document.getElementById('modal-vuelo-title').textContent='Editar cupo';
       document.getElementById('btn-crear-vuelo').textContent='Guardar cambios';
       document.getElementById('v-temporada').value=v.temporada_id||'';
       document.getElementById('v-destino').value=v.destino||'';
@@ -1265,8 +1265,8 @@ async function abrirModalVuelo(){
   editarVueloId=null;
   const {data:temps}=await sb.from('temporadas').select('*').order('creado_en',{ascending:false});
   document.getElementById('v-temporada').innerHTML=(temps||[]).map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
-  document.getElementById('modal-vuelo-title').textContent='Nuevo vuelo';
-  document.getElementById('btn-crear-vuelo').textContent='Crear vuelo';
+  document.getElementById('modal-vuelo-title').textContent='Nuevo cupo';
+  document.getElementById('btn-crear-vuelo').textContent='Crear cupo';
   ['v-destino','v-ciudad','v-aerolinea'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
   ['v-nombre','v-localizador','v-fecha','v-lugares','v-precio','v-precio-neto','v-equipaje'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
   document.getElementById('tramos-wrap').innerHTML='';
@@ -1285,7 +1285,7 @@ async function guardarVuelo(){
     const total_lugares=parseInt(document.getElementById('v-lugares').value);
     const ciudadVal=document.getElementById('v-ciudad').value;
     if(!nombre||!ciudadVal){mostrarAlerta('modal-v-alert','Nombre y ciudad son obligatorios','error');return;}
-    setBtnLoading('btn-crear-vuelo',true,editarVueloId?'Guardar cambios':'Crear vuelo');
+    setBtnLoading('btn-crear-vuelo',true,editarVueloId?'Guardar cambios':'Crear cupo');
     const [ciudad_codigo,ciudad_nombre]=ciudadVal.split('|');
     const itinerario=obtenerItinerario();
     const datos={
@@ -1325,12 +1325,12 @@ async function guardarVuelo(){
       mostrarAlerta('modal-v-alert','Vuelo actualizado','success');
       setTimeout(()=>{cerrarModal('modal-vuelo');if(currentVueloId===editarVueloId)cargarDetalle(editarVueloId)},1000);
     } else {
-      if(!total_lugares){mostrarAlerta('modal-v-alert','Total de lugares es obligatorio','error');setBtnLoading('btn-crear-vuelo',false,'Crear vuelo');return;}
+      if(!total_lugares){mostrarAlerta('modal-v-alert','Total de lugares es obligatorio','error');setBtnLoading('btn-crear-vuelo',false,'Crear cupo');return;}
       datos.total_lugares=total_lugares;
       const {data:vuelo,error}=await sb.from('vuelos').insert(datos).select().single();
-      if(error){setBtnLoading('btn-crear-vuelo',false,'Crear vuelo');mostrarAlerta('modal-v-alert',error.message,'error');return;}
+      if(error){setBtnLoading('btn-crear-vuelo',false,'Crear cupo');mostrarAlerta('modal-v-alert',error.message,'error');return;}
       const {error:errLug}=await sb.from('lugares').insert(Array.from({length:total_lugares},(_,i)=>({vuelo_id:vuelo.id,numero_lugar:i+1,es_infant:false})));
-      setBtnLoading('btn-crear-vuelo',false,'Crear vuelo');
+      setBtnLoading('btn-crear-vuelo',false,'Crear cupo');
       if(errLug){mostrarAlerta('modal-v-alert','Vuelo creado pero error al crear lugares: '+errLug.message,'error');return;}
       mostrarAlerta('modal-v-alert',`Vuelo creado con ${total_lugares} lugares`,'success');
       setTimeout(()=>{cerrarModal('modal-vuelo')},1200);
