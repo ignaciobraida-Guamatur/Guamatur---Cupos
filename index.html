@@ -62,6 +62,8 @@
   .badge-orange{background:rgba(255,128,0,0.2);color:#ff9933}
   .badge-red{background:rgba(255,59,59,0.2);color:#ff6b6b}
   .badge-yellow{background:rgba(251,191,36,0.12);color:var(--yellow)}
+  .badge-blue{background:rgba(96,165,250,0.18);color:var(--blue)}
+  .badge-cancelado{background:rgba(255,59,59,0.12);color:#ff8a8a;border:1px solid rgba(255,59,59,0.25)}
   .section-title{font-size:13px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
   .destino-header{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:20px 0 8px;display:flex;align-items:center;gap:8px}
   .destino-header:first-child{padding-top:0}
@@ -190,7 +192,8 @@
       </button>
       <div id="login-error" style="display:none;margin-top:14px;font-size:13px;color:#dc2626;background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);border-radius:8px;padding:10px 12px;text-align:left"></div>
       <div style="margin-top:16px;font-size:12px;color:var(--muted)">Solo usuarios autorizados pueden acceder</div>
-      <div class="app-version" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>
+      <div id="login-copyright" style="margin-top:18px;font-size:11px;color:var(--muted);letter-spacing:0.3px"></div>
+      <div class="app-version" style="margin-top:4px;font-size:10px;color:var(--muted);opacity:0.7"></div>
     </div>
   </div>
 </div>
@@ -246,7 +249,6 @@
 <div id="modal-pasajero" class="modal-overlay" style="display:none">
   <div class="modal">
     <div class="modal-title">Editar pasajero</div>
-    <div id="modal-p-alert"></div>
     <div class="form-grid">
       <div class="form-group"><label class="form-label">Primer apellido</label><input class="form-input" id="p-apellido1"/></div>
       <div class="form-group"><label class="form-label">Segundo apellido</label><input class="form-input" id="p-apellido2"/></div>
@@ -284,11 +286,12 @@
           <div class="form-group" id="pi-apellido2-group"><label class="form-label">Segundo apellido INFANT</label><input class="form-input" id="pi-apellido2"/></div>
           <div class="form-group"><label class="form-label">Primer nombre INFANT</label><input class="form-input" id="pi-nombre1"/></div>
           <div class="form-group" id="pi-nombre2-group"><label class="form-label">Segundo nombre INFANT</label><input class="form-input" id="pi-nombre2"/></div>
-          <div class="form-group full"><label class="form-label">Fecha de nacimiento INFANT <span style="color:var(--muted)">(para validar que sea INFANT y no CHILD)</span></label><input class="form-input" id="pi-fecha-nac" type="date"/></div>
+          <div class="form-group full"><label class="form-label">Fecha de nacimiento INFANT <span style="color:var(--muted)">(para validar que siga siendo INFANT)</span></label><input class="form-input" id="pi-fecha-nac" type="date"/></div>
         </div>
         <div id="pi-hint-v" style="display:none;font-size:11px;color:var(--yellow);margin-top:6px">Para status V son obligatorios los 4 campos del infant.</div>
       </div>
     </div>
+    <div id="modal-p-alert"></div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="cerrarModal('modal-pasajero')">Cancelar</button>
       <button class="btn btn-primary" id="btn-guardar-pasajero" onclick="guardarPasajero()">Guardar</button>
@@ -326,7 +329,7 @@
     <div class="modal-title">Cancelar lugares</div>
     <div id="modal-c-alert"></div>
     <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;padding:10px;font-size:13px;color:var(--yellow);margin-bottom:16px">
-      Los lugares seleccionados quedarán cancelados (amarillo) sin datos de pasajero.
+      Los lugares seleccionados quedarán <b>libres</b> (se borran los datos del pasajero). La cancelación queda registrada (quién/cuándo) en el log y en el dashboard de Cancelaciones.
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <span style="font-size:12px;color:var(--muted)">Seleccioná los lugares a cancelar</span>
@@ -356,7 +359,7 @@
     <div class="modal-title">Reducción de lugares</div>
     <div id="modal-red-alert"></div>
     <div style="background:rgba(255,128,0,0.08);border:1px solid rgba(255,128,0,0.2);border-radius:8px;padding:10px;font-size:13px;color:#ff9933;margin-bottom:16px">
-      La aerolínea bajó lugares del cupo. Los lugares reducidos no se borran: quedan al final de la planilla como <b>REDUCIDO</b> y no cuentan como libres. Solo se pueden reducir lugares <b>libres</b>.
+      Los lugares reducidos no se borran: quedan al final de la planilla como <b>REDUCIDO</b> y no cuentan como libres. Solo se pueden reducir lugares <b>libres</b>.
     </div>
     <div class="form-group">
       <label class="form-label">Cantidad a reducir <span id="red-libres-label" style="color:var(--muted)"></span></label>
@@ -372,11 +375,9 @@
 <!-- MODAL ELIMINAR MIS RESERVAS (vendedor) -->
 <div id="modal-eliminar" class="modal-overlay" style="display:none">
   <div class="modal" style="max-width:520px">
-    <div class="modal-title">Eliminar mis reservas</div>
+    <div class="modal-title" id="modal-elim-title">Eliminar reservas</div>
     <div id="modal-elim-alert"></div>
-    <div style="background:rgba(255,59,59,0.08);border:1px solid rgba(255,59,59,0.2);border-radius:8px;padding:10px;font-size:13px;color:#ff6b6b;margin-bottom:14px">
-      Se liberarán los lugares seleccionados (se borran los datos del pasajero de una sola vez). Solo podés eliminar reservas creadas por vos.
-    </div>
+    <div id="modal-elim-info" style="background:rgba(255,59,59,0.08);border:1px solid rgba(255,59,59,0.2);border-radius:8px;padding:10px;font-size:13px;color:#ff6b6b;margin-bottom:14px"></div>
     <div id="elim-lista" style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:14px"></div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="cerrarModal('modal-eliminar')">Cerrar</button>
@@ -511,8 +512,12 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-07 (b5 · ver-como)';
+const APP_VERSION='Fase 2 · 2026-06-08 (b6 · ajustes)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
+{const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
+// Identidad de marca Guamatur (tomada del sitio guamatur.com)
+const GUA_PRIMARY='#d11242', GUA_SECONDARY='#8946a0', GUA_LOGO='https://www.guamatur.com/assets/guamatur-logo-footer.svg';
+const AEROLINEA_COLOR={LATAM:'#1b0088',GOL:'#ff7a00',Avianca:'#d8202f',SKY:'#00247d','JetSmart':'#e40046',Azul:'#00a1de','Aerolíneas Argentinas':'#74acdf','Iberia':'#d7192d','Air Europa':'#0a3d91','American':'#0078d2','Copa':'#0c2340'};
 // Escape de HTML para todo dato de usuario interpolado en innerHTML/document.write (anti-XSS)
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 let currentUser=null,currentRol=null,currentVueloId=null,currentPasajeroId=null,currentLugarId=null,currentVueloFecha=null,sesionIniciada=false,rolEfectivo=null;
@@ -666,7 +671,11 @@ function mostrarAlerta(id,msg,tipo){
 }
 function cerrarModal(id){document.getElementById(id).style.display='none'}
 function calcularAlerta(l){return l===0?'COMPLETO':l<=3?'ULTIMOS':l<=5?'POCOS':'DISPONIBLE'}
-const alertaMap={COMPLETO:['badge-red','Completo'],ULTIMOS:['badge-orange','Últimos cupos'],POCOS:['badge-yellow','Pocos cupos'],DISPONIBLE:['badge-green','Disponible']};
+// Estado de un cupo: si no tiene lugares activos (total 0) => Cancelado; si no, por libres
+function estadoCupo(tot,libres){return tot===0?'CANCELADO':calcularAlerta(libres);}
+const alertaMap={CANCELADO:['badge-cancelado','Cancelado'],COMPLETO:['badge-red','Completo'],ULTIMOS:['badge-orange','Últimos cupos'],POCOS:['badge-yellow','Pocos cupos'],DISPONIBLE:['badge-green','Disponible']};
+// Color de badge por región de marca interna
+function regionBadge(d){return d==='Brasil'?'badge-green':d==='Caribe'?'badge-orange':d==='Chile'?'badge-blue':'badge-l';}
 function setBtnLoading(id,loading,texto='Guardar'){
   const btn=document.getElementById(id);if(!btn)return;
   btn.disabled=loading;
@@ -678,7 +687,7 @@ function toggleInfantFields(){
 }
 
 // ── DASHBOARD ────────────────────────────────────
-const alertaOrden={DISPONIBLE:0,POCOS:1,ULTIMOS:2,COMPLETO:3};
+const alertaOrden={DISPONIBLE:0,POCOS:1,ULTIMOS:2,COMPLETO:3,CANCELADO:4};
 
 
 async function cargarDashboard(){
@@ -702,7 +711,7 @@ async function cargarDashboard(){
   filtrados.forEach(v=>{
     const vV=v.vendidos||0,rV=v.reservados||0,lV=v.libres||0,tot=v.total||0;
     total+=tot;vendidos+=vV;reservados+=rV;libres+=lV;
-    const alerta=calcularAlerta(lV);
+    const alerta=estadoCupo(tot,lV);
     const [cls,txt]=alertaMap[alerta];
     filas.push({id:v.id,nombre:v.nombre,destino:v.destino,total:tot,vendidos:vV,reservados:rV,libres:lV,pct:tot>0?Math.round(vV/tot*100):0,cls,txt,orden:alertaOrden[alerta]});
   });
@@ -728,20 +737,24 @@ async function cargarDashboard(){
   (temps||[]).forEach(t=>{filtroHtml+=`<button class="filter-btn ${dashFiltro===t.id?'active':''}" onclick="setDashFiltro('${t.id}')">${esc(t.nombre)}</button>`;});
   filtroHtml+='</div>';
 
-  let html=filtroHtml+`<div class="kpi-grid">
-    <div class="kpi-card"><div class="kpi-label">Total cupos</div><div class="kpi-value c-blue">${total}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Vendidos</div><div class="kpi-value c-red">${vendidos}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Reservados</div><div class="kpi-value c-orange">${reservados}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Libres</div><div class="kpi-value c-green">${libres}</div></div>
-    <div class="kpi-card"><div class="kpi-label">% Ocupación</div><div class="kpi-value c-purple">${total>0?Math.round(vendidos/total*100):0}%</div></div>
-  </div>
+  const esAdminDash=rolEfectivo==='admin';
+  let html=filtroHtml;
+  // KPIs + análisis por región: solo admin (para el vendedor es redundante con la pestaña Cupos)
+  if(esAdminDash){
+    html+=`<div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Total cupos</div><div class="kpi-value c-blue">${total}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Vendidos</div><div class="kpi-value c-red">${vendidos}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Reservados</div><div class="kpi-value c-orange">${reservados}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Libres</div><div class="kpi-value c-green">${libres}</div></div>
+      <div class="kpi-card"><div class="kpi-label">% Ocupación</div><div class="kpi-value c-purple">${total>0?Math.round(vendidos/total*100):0}%</div></div>
+    </div>
+    <div class="section-title" style="margin-bottom:12px">Análisis por región</div>
+    <div class="table-wrap"><table><thead><tr><th>Cupo</th><th>Región</th><th>Total</th><th>Vendidos</th><th>Reservados</th><th>Libres</th><th>Ocup.</th><th>Alerta</th></tr></thead><tbody>`;
+    filas.forEach(d=>{html+=`<tr style="cursor:pointer" onclick="goToDetalle('${d.id}')"><td style="color:var(--accent2);font-weight:500">${esc(d.nombre)}</td><td><span class="badge ${regionBadge(d.destino)}">${esc(d.destino)||'—'}</span></td><td>${d.total}</td><td>${d.vendidos}</td><td>${d.reservados}</td><td>${d.libres}</td><td>${d.pct}%</td><td><span class="badge ${d.cls}">${d.txt}</span></td></tr>`;});
+    html+='</tbody></table></div>';
+  }
 
-  <div class="section-title" style="margin-bottom:12px">Análisis por región</div>
-  <div class="table-wrap"><table><thead><tr><th>Cupo</th><th>Región</th><th>Total</th><th>Vendidos</th><th>Reservados</th><th>Libres</th><th>Ocup.</th><th>Alerta</th></tr></thead><tbody>`;
-  filas.forEach(d=>{html+=`<tr style="cursor:pointer" onclick="goToDetalle('${d.id}')"><td style="color:var(--accent2);font-weight:500">${esc(d.nombre)}</td><td><span class="badge badge-${d.destino==='Brasil'?'green':'orange'}">${esc(d.destino)||'—'}</span></td><td>${d.total}</td><td>${d.vendidos}</td><td>${d.reservados}</td><td>${d.libres}</td><td>${d.pct}%</td><td><span class="badge ${d.cls}">${d.txt}</span></td></tr>`;});
-  html+='</tbody></table></div>';
-
-  // Dashboard vendedores
+  // Ranking de vendedores: lo ven todos
   html+=`<div class="section-title" style="margin-bottom:12px">Ranking de vendedores</div>
   <div class="table-wrap"><table><thead><tr><th>#</th><th>Vendedor</th><th>Lugares vendidos</th></tr></thead><tbody>`;
   ranking.forEach(([nombre,cant],i)=>{
@@ -749,13 +762,15 @@ async function cargarDashboard(){
   });
   html+='</tbody></table></div>';
 
-  // Dashboard cancelaciones
-  html+=`<div class="section-title" style="margin-bottom:12px">Cancelaciones</div>
-  <div class="op-grid" style="grid-template-columns:repeat(3,1fr)">
-    <div class="op-card"><div class="op-label">Cancelaciones</div><div class="op-value">${totalCancels}</div></div>
-    <div class="op-card ${totalPenalidad>0?'danger':''}"><div class="op-label">Penalidad total (USD)</div><div class="op-value ${totalPenalidad>0?'danger':''}">$${totalPenalidad.toLocaleString('es-UY',{minimumFractionDigits:0})}</div></div>
-    <div class="op-card"><div class="op-label">Recupero total (USD)</div><div class="op-value c-green">$${totalRecupero.toLocaleString('es-UY',{minimumFractionDigits:0})}</div></div>
-  </div>`;
+  // Cancelaciones: solo admin
+  if(esAdminDash){
+    html+=`<div class="section-title" style="margin-bottom:12px">Cancelaciones</div>
+    <div class="op-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="op-card"><div class="op-label">Cancelaciones</div><div class="op-value">${totalCancels}</div></div>
+      <div class="op-card ${totalPenalidad>0?'danger':''}"><div class="op-label">Penalidad total (USD)</div><div class="op-value ${totalPenalidad>0?'danger':''}">$${totalPenalidad.toLocaleString('es-UY',{minimumFractionDigits:0})}</div></div>
+      <div class="op-card"><div class="op-label">Recupero total (USD)</div><div class="op-value c-green">$${totalRecupero.toLocaleString('es-UY',{minimumFractionDigits:0})}</div></div>
+    </div>`;
+  }
 
   cont.innerHTML=html;
 }
@@ -782,7 +797,7 @@ function renderVuelos(lista){
   const esAdmin=rolEfectivo==='admin';
   const filas=lista.map(v=>{
     const vV=v.vendidos||0,rV=v.reservados||0,lV=v.libres||0,tot=v.total||0;
-    const alerta=calcularAlerta(lV);const [cls,txt]=alertaMap[alerta];
+    const alerta=estadoCupo(tot,lV);const [cls,txt]=alertaMap[alerta];
     return {...v,vV,rV,lV,tot,pct:tot>0?Math.round(vV/tot*100):0,cls,txt,orden:alertaOrden[alerta]};
   });
   // Orden por estado: Disponible → Pocos → Últimos → Completo
@@ -876,7 +891,7 @@ async function cargarDetalle(vueloId){
       <div class="detalle-titulo">${esc(vuelo.nombre)}</div>
       <div class="detalle-meta">
         <span>📍 ${esc(vuelo.ciudad_nombre)}</span>
-        ${vuelo.destino?`<span class="badge badge-${vuelo.destino==='Brasil'?'green':'orange'}">${esc(vuelo.destino)}</span>`:''}
+        ${vuelo.destino?`<span class="badge ${regionBadge(vuelo.destino)}">${esc(vuelo.destino)}</span>`:''}
         ${vuelo.fecha?`<span>📅 ${formatFecha(vuelo.fecha)}</span>`:''}
         ${vuelo.aerolinea?`<span>✈ ${esc(vuelo.aerolinea)}</span>`:''}
         ${vuelo.localizador?`<span style="color:var(--accent2)">🔑 ${esc(vuelo.localizador)}</span>`:''}
@@ -886,10 +901,10 @@ async function cargarDetalle(vueloId){
     </div>
     <div class="detalle-actions">
       <button class="btn btn-outline" onclick="goTo('vuelos')">← Volver</button>
-      <button class="btn btn-success" onclick="abrirModalReservar('${vueloId}',${lVReservable},'${idsLibres.join(',')}')">+ Reservar lugares</button>
+      <button class="btn btn-success" onclick="abrirModalReservar('${vueloId}',${lVReservable},'${idsLibres.join(',')}',${bloqLibres})">+ Reservar lugares</button>
       <button class="btn btn-excel" onclick="exportarExcel('${vueloId}')">⬇ Excel</button>
       ${(!esAdmin&&misReservas.length)?`<button class="btn btn-outline" onclick="abrirModalEliminar('${vueloId}')">🗑 Eliminar mis reservas (${misReservas.length})</button>`:''}
-      ${esAdmin?`<button class="btn btn-warning" onclick="abrirModalCancelar('${vueloId}')">⚠ Cancelar reservas</button><button class="btn btn-outline" onclick="abrirModalReducir('${vueloId}')">▾ Reducir lugares</button><button class="btn btn-outline" onclick="cancelarCupo('${vueloId}')">✖ Cancelar cupo</button><button class="btn btn-outline" onclick="abrirEditarVuelo('${vueloId}')">✏ Editar cupo</button>`:''}
+      ${esAdmin?`<button class="btn btn-warning" onclick="abrirModalCancelar('${vueloId}')">⚠ Cancelar reservas</button><button class="btn btn-outline" onclick="abrirModalEliminar('${vueloId}')">🗑 Eliminar reservas</button><button class="btn btn-outline" onclick="abrirModalReducir('${vueloId}')">▾ Reducir lugares</button><button class="btn btn-outline" onclick="cancelarCupo('${vueloId}')">✖ Cancelar cupo</button><button class="btn btn-outline" onclick="abrirEditarVuelo('${vueloId}')">✏ Editar cupo</button>`:''}
     </div>
   </div>`;
 
@@ -973,7 +988,7 @@ async function cargarDetalle(vueloId){
   html+=`<div class="table-wrap"><table><thead>${headPlanilla}</thead><tbody>`;
   lugaresActivos.forEach(l=>{html+=fila(l,'activo',true,numCols-1);});
   if(lugaresReducidos.length){
-    html+=`<tr><td colspan="${numCols}" style="background:var(--surface2);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Lugares reducidos (${lugaresReducidos.length}) — la aerolínea bajó estos lugares</td></tr>`;
+    html+=`<tr><td colspan="${numCols}" style="background:var(--surface2);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Lugares reducidos (${lugaresReducidos.length})</td></tr>`;
     lugaresReducidos.forEach(l=>{html+=fila(l,'reducido',true,numCols-1);});
   }
   html+='</tbody></table></div>';
@@ -982,7 +997,9 @@ async function cargarDetalle(vueloId){
   const esperaCols=esAdmin?14:13;
   if(lugaresEspera.length){
     const ocupEspera=lugaresEspera.filter(l=>l.pasajeros?.[0]&&l.pasajeros[0].status!=='L'&&!l.pasajeros[0].cancelado).length;
+    const libresEspera=lugaresEspera.filter(l=>!l.pasajeros?.[0]||l.pasajeros[0].status==='L').length;
     html+=`<details style="margin-bottom:24px"><summary style="cursor:pointer;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;font-size:13px;font-weight:500;color:var(--accent2);list-style:none">📋 Lista de espera — ${ocupEspera}/${lugaresEspera.length} ocupados <span style="color:var(--muted);font-weight:400">(click para desplegar)</span></summary>
+    <div style="margin-top:8px">${libresEspera>0?`<button class="btn btn-success" onclick="abrirModalReservarEspera('${vueloId}',${libresEspera})">+ Reservar en espera</button>`:''}</div>
     <div class="table-wrap" style="margin-top:8px"><table><thead><tr><th>#</th><th>Primer apellido</th><th>Segundo apellido</th><th>Primer nombre</th><th>Segundo nombre</th><th>Hotel</th><th>Vendedor</th><th>Status</th><th>Factura</th><th>Fecha reserva</th><th>Vencimiento</th>${esAdmin?'<th>Ficha</th>':''}<th>Comentarios</th><th></th></tr></thead><tbody>`;
     lugaresEspera.forEach(l=>{html+=fila(l,'espera',true,esperaCols-1);});
     html+='</tbody></table></div></details>';
@@ -1124,7 +1141,7 @@ async function guardarPasajero(){
           if(dep.getDate()<nac.getDate()) meses--;
           if(meses>=24){
             setBtnLoading('btn-guardar-pasajero',false,'Guardar');
-            mostrarAlerta('modal-p-alert',`A la fecha del cupo el INFANT tendría ${Math.floor(meses/12)} año(s) ${meses%12} mes(es): ya NO califica como INFANT (sería CHILD y ocupa asiento). Revisá la fecha de nacimiento.`,'error');
+            mostrarAlerta('modal-p-alert',`A la fecha del cupo tendría ${Math.floor(meses/12)} año(s) y ${meses%12} mes(es): ya NO califica como INFANT y ocupa un asiento. Revisá la fecha de nacimiento.`,'error');
             return;
           }
         }
@@ -1166,9 +1183,9 @@ async function guardarPasajero(){
 }
 
 // ── MODAL RESERVAR ───────────────────────────────
-let reservarModoEspera=false;
-function abrirModalReservar(vueloId,libres,idsStr){
-  reservarModoEspera=false;
+let reservarModoEspera=false,reservarModoEsperaBulk=false,reservarBloqLibres=0;
+function abrirModalReservar(vueloId,libres,idsStr,bloq){
+  reservarModoEspera=false;reservarModoEsperaBulk=false;reservarBloqLibres=parseInt(bloq)||0;
   reservarVueloId=vueloId;reservarLugaresLibres=parseInt(libres);
   reservarLugaresIds=idsStr?idsStr.split(',').filter(x=>x):[];
   document.getElementById('r-cantidad').value='';
@@ -1188,7 +1205,11 @@ async function confirmarReserva(){
   const nombre=document.getElementById('r-nombre').value.trim();
   if(!cantidad||cantidad<1){mostrarAlerta('modal-r-alert','Ingresá una cantidad válida','error');return;}
   if(!apellido&&!nombre){mostrarAlerta('modal-r-alert','Ingresá al menos apellido o nombre','error');return;}
-  if(!reservarModoEspera&&cantidad>reservarLugaresLibres){mostrarAlerta('modal-r-alert',`Solo hay ${reservarLugaresLibres} lugares disponibles`,'error');return;}
+  if(!reservarModoEspera&&cantidad>reservarLugaresLibres){
+    let m=`Solo hay ${reservarLugaresLibres} lugar${reservarLugaresLibres===1?'':'es'} disponible${reservarLugaresLibres===1?'':'s'} para reservar`;
+    if(!reservarModoEsperaBulk&&reservarBloqLibres>0) m+=`. Hay ${reservarBloqLibres} lugar${reservarBloqLibres===1?'':'es'} más reservado${reservarBloqLibres===1?'':'s'} para Operaciones — solicitalos a un administrador.`;
+    mostrarAlerta('modal-r-alert',m,'error');return;
+  }
   setBtnLoading('btn-confirmar-reserva',true,'Confirmar reserva');
   await asegurarTokenFresco();
   const vendedorNombre=vendedores.find(v=>v.email===currentUser.email)?.nombre||currentUser.email;
@@ -1196,8 +1217,10 @@ async function confirmarReserva(){
   let res;
   if(reservarModoEspera){
     res=await conReintentoAuth(()=>sb.rpc('reservar_lugar',{p_lugar_id:reservarLugaresIds[0],p_vendedor:vendedorNombre,p_apellido:apellido,p_nombre:nombre}),'RPC reservar_lugar');
+  } else if(reservarModoEsperaBulk){
+    res=await conReintentoAuth(()=>sb.rpc('reservar_lugares',{p_vuelo_id:reservarVueloId,p_cantidad:cantidad,p_vendedor:vendedorNombre,p_apellido:apellido,p_nombre:nombre,p_excluir_operaciones:false,p_solo_espera:true}),'RPC reservar_lugares espera');
   } else {
-    res=await conReintentoAuth(()=>sb.rpc('reservar_lugares',{p_vuelo_id:reservarVueloId,p_cantidad:cantidad,p_vendedor:vendedorNombre,p_apellido:apellido,p_nombre:nombre,p_excluir_operaciones:rolEfectivo!=='admin'}),'RPC reservar_lugares');
+    res=await conReintentoAuth(()=>sb.rpc('reservar_lugares',{p_vuelo_id:reservarVueloId,p_cantidad:cantidad,p_vendedor:vendedorNombre,p_apellido:apellido,p_nombre:nombre,p_excluir_operaciones:rolEfectivo!=='admin',p_solo_espera:false}),'RPC reservar_lugares');
   }
   setBtnLoading('btn-confirmar-reserva',false,'Confirmar reserva');
   if(res?.error){console.error('[Reserva] RPC error',res.error);mostrarAlerta('modal-r-alert','Error al reservar: '+res.error.message,'error');return;}
@@ -1218,13 +1241,27 @@ async function confirmarReserva(){
 
 // ── LUGARES: lista de espera / bloqueo Operaciones / reducción ──
 function reservarSlot(lugarId,vueloId){
-  reservarModoEspera=true;
+  reservarModoEspera=true;reservarModoEsperaBulk=false;reservarBloqLibres=0;
   reservarVueloId=vueloId;reservarLugaresLibres=1;reservarLugaresIds=[lugarId];
   document.getElementById('r-cantidad').value='1';
   document.getElementById('r-cantidad').disabled=true;
   document.getElementById('r-apellido').value='';
   document.getElementById('r-nombre').value='';
   document.getElementById('r-libres-label').textContent='(lista de espera)';
+  document.getElementById('modal-r-alert').innerHTML='';
+  document.getElementById('btn-confirmar-reserva').disabled=false;
+  document.getElementById('btn-confirmar-reserva').textContent='Confirmar reserva';
+  document.getElementById('modal-reservar').style.display='flex';
+}
+// Reservar VARIOS lugares de lista de espera a la vez
+function abrirModalReservarEspera(vueloId,libresEspera){
+  reservarModoEspera=false;reservarModoEsperaBulk=true;reservarBloqLibres=0;
+  reservarVueloId=vueloId;reservarLugaresLibres=parseInt(libresEspera)||0;reservarLugaresIds=[];
+  document.getElementById('r-cantidad').value='';
+  document.getElementById('r-cantidad').disabled=false;
+  document.getElementById('r-apellido').value='';
+  document.getElementById('r-nombre').value='';
+  document.getElementById('r-libres-label').textContent=`(${reservarLugaresLibres} en lista de espera)`;
   document.getElementById('modal-r-alert').innerHTML='';
   document.getElementById('btn-confirmar-reserva').disabled=false;
   document.getElementById('btn-confirmar-reserva').textContent='Confirmar reserva';
@@ -1295,7 +1332,7 @@ async function confirmarReduccion(){
   setTimeout(()=>{cerrarModal('modal-reducir');cargarDetalle(reducirVueloId)},1000);
 }
 async function cancelarCupo(vueloId){
-  if(!confirm('¿Cancelar el CUPO COMPLETO? Todos los lugares quedarán como REDUCIDOS (los pasajeros cargados se conservan en la sección de reducidos). Usalo cuando la aerolínea da de baja todo el cupo.'))return;
+  if(!confirm('¿Cancelar el CUPO COMPLETO? Todos los lugares quedarán como REDUCIDOS (los pasajeros cargados se conservan en la sección de reducidos).'))return;
   await asegurarTokenFresco();
   const {error}=await sb.from('lugares').update({reducido:true,bloqueado_operaciones:false}).eq('vuelo_id',vueloId).eq('es_espera',false);
   if(error){alert('Error al cancelar cupo: '+error.message);return;}
@@ -1318,11 +1355,16 @@ async function abrirModalEliminar(vueloId){
   document.getElementById('modal-elim-alert').innerHTML='';
   document.getElementById('btn-confirmar-elim').disabled=false;
   document.getElementById('btn-confirmar-elim').textContent='Eliminar seleccionadas';
+  const soloPropias=rolEfectivo!=='admin';
+  document.getElementById('modal-elim-title').textContent=soloPropias?'Eliminar mis reservas':'Eliminar reservas';
+  document.getElementById('modal-elim-info').textContent=soloPropias
+    ?'Se liberarán los lugares seleccionados (se borran los datos del pasajero de una sola vez). Solo podés eliminar reservas creadas por vos.'
+    :'Se liberarán los lugares seleccionados (se borran los datos del pasajero). Esto NO registra una cancelación con penalidad/recupero — para eso usá "Cancelar reservas".';
   const mi=vendedores.find(v=>v.email===currentUser?.email)?.nombre||currentUser?.email;
   const {data:lugs}=await sb.from('lugares').select('id,numero_lugar,es_espera,pasajeros(id,status,cancelado,vendedor,primer_apellido,primer_nombre)').eq('vuelo_id',vueloId).order('numero_lugar');
-  eliminarList=(lugs||[]).filter(l=>{const p=l.pasajeros?.[0];return p&&!p.cancelado&&p.status!=='L'&&p.vendedor===mi;});
+  eliminarList=(lugs||[]).filter(l=>{const p=l.pasajeros?.[0];return p&&!p.cancelado&&p.status!=='L'&&(!soloPropias||p.vendedor===mi);});
   const lista=document.getElementById('elim-lista');
-  if(!eliminarList.length){lista.innerHTML='<div style="padding:12px;font-size:13px;color:var(--muted)">No tenés reservas propias en este cupo.</div>';}
+  if(!eliminarList.length){lista.innerHTML=`<div style="padding:12px;font-size:13px;color:var(--muted)">${soloPropias?'No tenés reservas propias en este cupo.':'No hay reservas en este cupo.'}</div>`;}
   else{
     lista.innerHTML=eliminarList.map(l=>{const p=l.pasajeros[0];const nombre=p.primer_apellido?esc(`${p.primer_apellido} ${p.primer_nombre||''}`.trim()):'(sin nombre)';const et=l.es_espera?' <span class="badge badge-l">espera</span>':'';return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border)"><input type="checkbox" id="elc-${l.id}" checked style="width:16px;height:16px;cursor:pointer"/><span style="font-family:'DM Mono',monospace;min-width:24px">${l.numero_lugar}</span><span class="badge badge-${p.status==='V'?'v':'r'}">${esc(p.status)}</span>${et}<span style="font-size:13px">${nombre}</span></div>`;}).join('');
   }
@@ -1396,7 +1438,7 @@ async function confirmarCancelacion(){
   for(const l of seleccionados){
     const p=l.pasajeros?.[0];
     if(p?.id){
-      const upd=await conReintentoAuth(()=>sb.from('pasajeros').update({status:'L',cancelado:true,factura:null,fecha_reserva:null,primer_apellido:null,primer_nombre:null,segundo_apellido:null,segundo_nombre:null,hotel:null,vendedor:null,ficha:null,comentarios:null,actualizado_en:new Date().toISOString()}).eq('id',p.id),'UPDATE cancelar pasajero');
+      const upd=await conReintentoAuth(()=>sb.from('pasajeros').update({status:'L',cancelado:false,factura:null,fecha_reserva:null,primer_apellido:null,primer_nombre:null,segundo_apellido:null,segundo_nombre:null,hotel:null,vendedor:null,ficha:null,comentarios:null,aviso_vencimiento_enviado:false,actualizado_en:new Date().toISOString()}).eq('id',p.id),'UPDATE cancelar pasajero');
       if(upd?.error){console.error('[Cancelar] Error update pasajero:',upd.error);errors.push(`Lugar ${l.numero_lugar}: ${upd.error.message}`);continue;}
       await sb.from('infants').delete().eq('pasajero_id',p.id);
     }
@@ -1459,25 +1501,30 @@ async function imprimirItinerario(vueloId){
   const {data:v}=await sb.from('vuelos').select('*').eq('id',vueloId).single();
   if(!v){alert('No se pudo cargar el cupo');return;}
   const it=Array.isArray(v.itinerario)?v.itinerario:[];
-  const filas=it.map(t=>`<tr><td>${esc(t.tipo||'Ida')}</td><td>${esc(t.fecha)}</td><td>${esc(t.aerolinea)}</td><td>${esc(t.vuelo)}</td><td>${esc(t.origen)}</td><td>${esc(t.destino)}</td><td>${esc(t.salida)}</td><td>${esc(t.llegada)}</td></tr>`).join('');
-  // LOGO: placeholder de texto. Cuando tengamos el archivo, reemplazar por <img src="...">.
-  const logo=`<div style="font-size:26px;font-weight:700;color:#7c3aed;letter-spacing:1px">GUAMATUR</div><div style="font-size:11px;color:#666;letter-spacing:3px">VIAJES &amp; TURISMO</div>`;
+  const pillAir=(name)=>{const c=AEROLINEA_COLOR[name];const n=esc(name||'');return n?`<span style="display:inline-block;background:${c||'#555'};color:#fff;padding:2px 9px;border-radius:11px;font-size:11px;font-weight:600">${n}</span>`:'—';};
+  const filas=it.map(t=>{const tipo=esc(t.tipo||'Ida');const tipoCol=tipo==='Vuelta'?GUA_SECONDARY:GUA_PRIMARY;return `<tr><td><span style="color:${tipoCol};font-weight:600">${tipo}</span></td><td>${esc(t.fecha)||'—'}</td><td>${pillAir(t.aerolinea)}</td><td>${esc(t.vuelo)||'—'}</td><td>${esc(t.origen)||'—'}</td><td>${esc(t.destino)||'—'}</td><td>${esc(t.salida)||'—'}</td><td>${esc(t.llegada)||'—'}</td></tr>`;}).join('');
   const w=window.open('','_blank');
   if(!w){alert('Permití las ventanas emergentes para imprimir');return;}
   w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Itinerario ${esc(v.nombre)}</title>
-  <style>body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;padding:32px;max-width:820px;margin:0 auto}
-  .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #7c3aed;padding-bottom:16px;margin-bottom:20px}
-  h1{font-size:18px;margin:0 0 6px}.meta{font-size:13px;color:#444;line-height:1.6}
-  table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
-  th{background:#7c3aed;color:#fff;text-align:left;padding:8px}td{padding:8px;border-bottom:1px solid #ddd}
-  .ft{margin-top:24px;font-size:11px;color:#888;border-top:1px solid #ddd;padding-top:12px}
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>body{font-family:'Montserrat',Arial,Helvetica,sans-serif;color:#1a1a1a;padding:32px;max-width:820px;margin:0 auto}
+  .head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid ${GUA_PRIMARY};padding-bottom:16px;margin-bottom:22px}
+  .head img{height:46px}
+  h1{font-size:18px;margin:0 0 6px;color:#1a1a1a}.meta{font-size:13px;color:#555;line-height:1.6}
+  h2{font-size:14px;color:${GUA_PRIMARY};font-weight:700;margin:0 0 4px}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+  th{background:${GUA_PRIMARY};color:#fff;text-align:left;padding:9px;font-weight:600}
+  td{padding:8px 9px;border-bottom:1px solid #eee}
+  tr:nth-child(even) td{background:#faf7f8}
+  .ft{margin-top:26px;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:12px}
   @media print{.noprint{display:none}}</style></head><body>
-  <div class="head"><div>${logo}</div><div style="text-align:right"><h1>${esc(v.nombre)}</h1><div class="meta">${esc(v.ciudad_nombre)}${v.fecha?' · '+formatFecha(v.fecha):''}${v.aerolinea?' · '+esc(v.aerolinea):''}${v.localizador?'<br>Localizador: '+esc(v.localizador):''}</div></div></div>
-  <h2 style="font-size:14px;color:#7c3aed">Itinerario de vuelo</h2>
+  <div class="head"><img src="${GUA_LOGO}" alt="Guamatur Viajes"/><div style="text-align:right"><h1>${esc(v.nombre)}</h1><div class="meta">${esc(v.ciudad_nombre)}${v.fecha?' · '+formatFecha(v.fecha):''}${v.aerolinea?' · '+esc(v.aerolinea):''}${v.localizador?'<br>Localizador: '+esc(v.localizador):''}</div></div></div>
+  <h2>Itinerario de vuelo</h2>
   ${it.length?`<table><thead><tr><th>Tipo</th><th>Fecha</th><th>Aerolínea</th><th>Vuelo</th><th>Origen</th><th>Destino</th><th>Salida</th><th>Llegada</th></tr></thead><tbody>${filas}</tbody></table>`:'<p>Sin itinerario cargado.</p>'}
-  ${v.condiciones_equipaje?`<p style="margin-top:16px;font-size:13px"><b>Equipaje:</b> ${esc(v.condiciones_equipaje)}</p>`:''}
-  <div class="ft">Documento generado por el sistema de Cupos de Guamatur. Sujeto a confirmación de la aerolínea.</div>
-  <div class="noprint" style="margin-top:20px;text-align:center"><button onclick="window.print()" style="background:#7c3aed;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:14px;cursor:pointer">Imprimir / Guardar PDF</button></div>
+  ${v.condiciones_equipaje?`<p style="margin-top:16px;font-size:13px"><b style="color:${GUA_PRIMARY}">Equipaje:</b> ${esc(v.condiciones_equipaje)}</p>`:''}
+  <div class="ft">Documento generado por el sistema de Cupos de Guamatur · guamatur.com · Sujeto a confirmación.</div>
+  <div class="noprint" style="margin-top:22px;text-align:center"><button onclick="window.print()" style="background:${GUA_PRIMARY};color:#fff;border:none;padding:11px 22px;border-radius:6px;font-size:14px;font-family:'Montserrat',sans-serif;font-weight:600;cursor:pointer">Imprimir / Guardar PDF</button></div>
   </body></html>`);
   w.document.close();
 }
@@ -1493,7 +1540,7 @@ async function cargarAdmin(){
   ]);
   renderLog(logs||[]);
   temporadas=temps||[];
-  document.getElementById('admin-temporadas').innerHTML=temporadas.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><div style="font-size:13px;font-weight:500">${esc(t.nombre)}</div><span class="badge ${t.activa?'badge-green':'badge-l'}">${t.activa?'Activa':'Inactiva'}</span></div>`).join('');
+  document.getElementById('admin-temporadas').innerHTML=temporadas.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px"><div style="font-size:13px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.nombre)}</div><span class="badge ${t.activa?'badge-green':'badge-l'}">${t.activa?'Activa':'Inactiva'}</span><button class="btn-sm" onclick="toggleActivaTemporada('${t.id}',${!!t.activa})">${t.activa?'Desactivar':'Activar'}</button></div>`).join('');
   document.getElementById('admin-vuelos').innerHTML=(vuelos||[]).map(v=>{
     const vis=v.visible!==false;
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);gap:8px"><span style="font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(v.nombre)}</span><button class="btn-sm" onclick="toggleVisibilidadVuelo('${v.id}',${vis})" title="${vis?'Ocultar a vendedores':'Mostrar a vendedores'}">${vis?'👁 Visible':'🚫 Oculto'}</button><button class="btn-sm" onclick="abrirEditarVuelo('${v.id}')">Editar</button></div>`;
@@ -1502,7 +1549,7 @@ async function cargarAdmin(){
   renderUsuarios();
 }
 
-const accionLabel={crear_cupo:'Creó cupo',editar_cupo:'Editó cupo',reserva:'Reservó',alta_pasajero:'Cargó pasajero',editar_pasajero:'Editó pasajero',cancelar_reserva:'Canceló reserva(s)',reduccion_lugares:'Redujo lugares',cancelacion_cupo:'Canceló cupo',restaurar_lugar:'Restauró lugar',visibilidad:'Cambió visibilidad',eliminar_reserva:'Eliminó reserva'};
+const accionLabel={crear_cupo:'Creó cupo',editar_cupo:'Editó cupo',reserva:'Reservó',alta_pasajero:'Cargó pasajero',editar_pasajero:'Editó pasajero',cancelar_reserva:'Canceló reserva(s)',reduccion_lugares:'Redujo lugares',cancelacion_cupo:'Canceló cupo',restaurar_lugar:'Restauró lugar',visibilidad:'Cambió visibilidad',eliminar_reserva:'Eliminó reserva',temporada_activa:'Activó/desactivó temporada',vencimiento_auto:'Vencimiento automático'};
 function renderLog(logs){
   const el=document.getElementById('admin-log');if(!el)return;
   if(!logs.length){el.innerHTML='<div style="font-size:13px;color:var(--muted)">Sin actividad registrada todavía.</div>';return;}
@@ -1518,6 +1565,14 @@ async function toggleVisibilidadVuelo(id,actual){
   const {error}=await sb.from('vuelos').update({visible:!actual}).eq('id',id);
   if(error){alert('Error al cambiar visibilidad: '+error.message);return;}
   await registrarLog('visibilidad','vuelo',id,{visible:!actual});
+  cargarAdmin();
+}
+
+async function toggleActivaTemporada(id,actual){
+  await asegurarTokenFresco();
+  const {error}=await sb.from('temporadas').update({activa:!actual}).eq('id',id);
+  if(error){alert('Error al cambiar la temporada: '+error.message);return;}
+  await registrarLog('temporada_activa','temporada',id,{activa:!actual});
   cargarAdmin();
 }
 
@@ -1588,10 +1643,8 @@ async function guardarTemporada(){
   const nombre=document.getElementById('temp-nombre').value.trim();
   if(!nombre){mostrarAlerta('modal-t-alert','El nombre es obligatorio','error');return;}
   setBtnLoading('btn-guardar-temp',true);
-  const activa=document.getElementById('temp-activa').value==='true';
-  // Si la nueva queda activa, desactivar las demás (una sola activa a la vez)
-  if(activa){await sb.from('temporadas').update({activa:false}).eq('activa',true);}
-  const {error}=await sb.from('temporadas').insert({nombre,activa});
+  // Pueden coexistir varias temporadas activas.
+  const {error}=await sb.from('temporadas').insert({nombre,activa:document.getElementById('temp-activa').value==='true'});
   setBtnLoading('btn-guardar-temp',false,'Guardar');
   if(error){mostrarAlerta('modal-t-alert',error.message,'error');return;}
   mostrarAlerta('modal-t-alert','Temporada creada','success');
