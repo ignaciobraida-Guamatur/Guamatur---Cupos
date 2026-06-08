@@ -155,6 +155,10 @@
     <button class="nav-link" id="nav-admin" style="display:none" onclick="goTo('admin')">Administración</button>
   </div>
   <div class="nav-right">
+    <select id="ver-como" onchange="cambiarVista(this.value)" title="Ver la app como Admin o como Vendedor" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;font-size:12px;padding:4px 8px;font-family:'DM Sans',sans-serif;cursor:pointer">
+      <option value="admin">👁 Ver como: Admin</option>
+      <option value="vendedor">👁 Ver como: Vendedor</option>
+    </select>
     <span class="rol-badge" id="rol-badge" style="display:none"></span>
     <div class="avatar" id="user-avatar" style="display:none" title="Cerrar sesión" onclick="cerrarSesion()"></div>
     <div class="hamburger" id="hamburger" style="display:none" onclick="toggleMobileMenu()">
@@ -507,11 +511,11 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-07 (b4 · fixes auditoría)';
+const APP_VERSION='Fase 2 · 2026-06-07 (b5 · ver-como)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 // Escape de HTML para todo dato de usuario interpolado en innerHTML/document.write (anti-XSS)
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-let currentUser=null,currentRol=null,currentVueloId=null,currentPasajeroId=null,currentLugarId=null,currentVueloFecha=null,sesionIniciada=false;
+let currentUser=null,currentRol=null,currentVueloId=null,currentPasajeroId=null,currentLugarId=null,currentVueloFecha=null,sesionIniciada=false,rolEfectivo=null;
 let temporadas=[],temporadaActiva=null,vuelosData=[],tramosCount=0,dashFiltro='todos';
 let reservarVueloId=null,reservarLugaresLibres=0,reservarLugaresIds=[];
 let cancelarLugarId=null,cancelarPasajeroId=null,cancelarVueloId=null;
@@ -562,7 +566,7 @@ async function iniciarSesion(session){
   if(!u){
     // Whitelist: solo usuarios pre-cargados (vendedor/admin) pueden ingresar. No se auto-crean cuentas.
     const emailNoAuth=currentUser.email;
-    currentUser=null;currentRol=null;
+    currentUser=null;currentRol=null;rolEfectivo=null;
     await sb.auth.signOut();
     document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
     document.getElementById('screen-login').classList.add('active');
@@ -575,27 +579,50 @@ async function iniciarSesion(session){
   // Actualizar ID si cambió (primer login de un usuario pre-cargado)
   if(u.id!==currentUser.id) await sb.from('usuarios').update({id:currentUser.id}).eq('email',currentUser.email);
   currentRol=u.rol;
+  rolEfectivo=u.rol;
   // Cargar vendedores
   const {data:vends,error:ve}=await sb.from('usuarios').select('nombre,email,rol').order('nombre');
   console.log('vendedores cargados:',vends?.length,ve);
   vendedores=vends||[];
   // Poblar dropdown vendedor
   const sel=document.getElementById('p-vendedor');
-  sel.innerHTML='<option value="">Seleccionar...</option>'+vendedores.map(v=>`<option value="${v.nombre}">${v.nombre}</option>`).join('');
+  sel.innerHTML='<option value="">Seleccionar...</option>'+vendedores.map(v=>`<option value="${esc(v.nombre)}">${esc(v.nombre)}</option>`).join('');
 
   document.getElementById('user-avatar').textContent=currentUser.email[0].toUpperCase();
   document.getElementById('user-avatar').style.display='flex';
   document.getElementById('nav-links').style.display='flex';
   document.getElementById('hamburger').style.display='flex';
-  document.getElementById('rol-badge').textContent=currentRol==='admin'?'Admin':'Vendedor';
   document.getElementById('rol-badge').style.display='block';
-  if(currentRol==='admin'){document.getElementById('nav-admin').style.display='block';document.getElementById('mobile-admin').style.display='block';}
-  if(currentRol==='vendedor') document.getElementById('p-status-group').style.display='none';
+  // Selector "Ver como" solo para administradores reales (vista previa de rol)
+  if(rolEfectivo==='admin'){const vc=document.getElementById('ver-como');if(vc){vc.style.display='inline-block';vc.value=rolEfectivo;}}
+  aplicarRolEfectivoUI();
   // El vencimiento de reservas corre server-side (función vencer_reservas() + pg_cron), no en el cliente.
   goTo('dashboard');
 }
 
 function toggleMobileMenu(){document.getElementById('mobile-menu').classList.toggle('open')}
+
+// ── VISTA PREVIA DE ROL (admin puede ver la app como vendedor) ──
+function aplicarRolEfectivoUI(){
+  const adminUI=rolEfectivo==='admin';
+  const na=document.getElementById('nav-admin'); if(na) na.style.display=adminUI?'block':'none';
+  const ma=document.getElementById('mobile-admin'); if(ma) ma.style.display=adminUI?'block':'none';
+  const rb=document.getElementById('rol-badge'); if(rb) rb.textContent=adminUI?'Admin':'Vendedor';
+  const vc=document.getElementById('ver-como'); if(vc&&currentRol==='admin'){vc.style.display='inline-block';vc.value=rolEfectivo;}
+}
+function cambiarVista(rol){
+  if(currentRol!=='admin') return; // solo admins reales pueden simular vista
+  rolEfectivo=(rol==='vendedor')?'vendedor':'admin';
+  aplicarRolEfectivoUI();
+  const act=document.querySelector('.screen.active');
+  const id=act?act.id:'';
+  if(id==='screen-admin'&&rolEfectivo!=='admin'){goTo('vuelos');return;}
+  if(id==='screen-dashboard') cargarDashboard();
+  else if(id==='screen-vuelos') cargarVuelos();
+  else if(id==='screen-admin') cargarAdmin();
+  else if(id==='screen-detalle'&&currentVueloId) cargarDetalle(currentVueloId);
+  else goTo('dashboard');
+}
 
 let dashCargado=false,vuelosCargado=false,adminCargado=false;
 
@@ -666,7 +693,7 @@ async function cargarDashboard(){
   ]);
   if(!vuelos){cont.innerHTML='<div class="loading" style="color:var(--red)">Error</div>';return;}
 
-  const vuelosVis=(currentRol==='admin')?vuelos:vuelos.filter(v=>v.visible!==false);
+  const vuelosVis=(rolEfectivo==='admin')?vuelos:vuelos.filter(v=>v.visible!==false);
   const filtrados=dashFiltro==='todos'?vuelosVis:vuelosVis.filter(v=>v.temporada_id===dashFiltro);
   const vueloIds=new Set(filtrados.map(v=>v.id));
 
@@ -744,7 +771,7 @@ async function cargarVuelos(){
   document.getElementById('temp-selector-wrap').innerHTML=temporadas.map(t=>`<button class="temp-btn ${t.id===temporadaActiva?'active':''}" onclick="seleccionarTemporada('${t.id}')">${esc(t.nombre)}</button>`).join('');
   if(!temporadaActiva){cont.innerHTML='<div class="loading">No hay temporadas creadas</div>';return;}
   let qv=sb.from('vista_vuelos').select('*').eq('temporada_id',temporadaActiva);
-  if(currentRol!=='admin') qv=qv.eq('visible',true);
+  if(rolEfectivo!=='admin') qv=qv.eq('visible',true);
   const {data:vuelos}=await qv.order('nombre');
   vuelosData=vuelos||[];renderVuelos(vuelosData);
 }
@@ -752,7 +779,7 @@ function seleccionarTemporada(id){temporadaActiva=id;cargarVuelos()}
 function renderVuelos(lista){
   const cont=document.getElementById('vuelos-content');
   if(!lista.length){cont.innerHTML='<div class="loading">No hay cupos en esta temporada</div>';return;}
-  const esAdmin=currentRol==='admin';
+  const esAdmin=rolEfectivo==='admin';
   const filas=lista.map(v=>{
     const vV=v.vendidos||0,rV=v.reservados||0,lV=v.libres||0,tot=v.total||0;
     const alerta=calcularAlerta(lV);const [cls,txt]=alertaMap[alerta];
@@ -832,7 +859,7 @@ async function cargarDetalle(vueloId){
   const libresArr=lugaresActivos.filter(l=>!l.pasajeros?.[0]||l.pasajeros[0].status==='L');
   const lV=libresArr.length;
   const esVueloC=lV<=3;
-  const esAdmin=currentRol==='admin';
+  const esAdmin=rolEfectivo==='admin';
   const infantMap={};
   (infants||[]).forEach(inf=>{if(inf.pasajero_id)infantMap[inf.pasajero_id]=inf});
   // Reservable: admin todos los libres; vendedor excluye los bloqueados para Operaciones
@@ -980,16 +1007,18 @@ function abrirModalPasajero(lugarId,pasajero,vueloId,infant=null){
   document.getElementById('p-status').value=esLibre?'L':(pasajero.status||'L');
   document.getElementById('p-factura').value=esLibre?'':(pasajero.factura||'');
   document.getElementById('p-comentarios').value=esLibre?'':(pasajero.comentarios||'');
+  // El vendedor no elige status (queda R); solo admin ve el selector
+  document.getElementById('p-status-group').style.display=(rolEfectivo==='admin')?'':'none';
   // Fecha de reserva (solo admin la ve y edita)
   const fechaResGroup=document.getElementById('p-fecha-reserva-group');
-  if(currentRol==='admin'){
+  if(rolEfectivo==='admin'){
     fechaResGroup.style.display='';
     document.getElementById('p-fecha-reserva').value=(!esLibre&&pasajero.fecha_reserva)?toDatetimeLocal(pasajero.fecha_reserva):'';
   } else {
     fechaResGroup.style.display='none';
   }
   const vendedorEl=document.getElementById('p-vendedor');
-  if(currentRol==='admin'){
+  if(rolEfectivo==='admin'){
     vendedorEl.disabled=false;
     vendedorEl.value=esLibre?'':(pasajero.vendedor||'');
   } else {
@@ -1039,7 +1068,7 @@ function fromDatetimeLocal(val){
 
 async function guardarPasajero(){
   let status=document.getElementById('p-status').value;
-  if(currentRol==='vendedor'&&status==='L') status='R';
+  if(rolEfectivo==='vendedor'&&status==='L') status='R';
   const factura=document.getElementById('p-factura').value.trim();
   if(status==='V'&&!factura){mostrarAlerta('modal-p-alert','Factura obligatoria para status V','error');return;}
   setBtnLoading('btn-guardar-pasajero',true);
@@ -1058,7 +1087,7 @@ async function guardarPasajero(){
       status,factura:factura||null,cancelado:false,aviso_vencimiento_enviado:false,actualizado_en:new Date().toISOString()
     };
     // Fecha de reserva: admin puede editarla; si no, se setea automáticamente al crear una R
-    if(currentRol==='admin'){
+    if(rolEfectivo==='admin'){
       const fechaManual=document.getElementById('p-fecha-reserva').value;
       if(fechaManual){
         datos.fecha_reserva=fromDatetimeLocal(fechaManual);
@@ -1168,7 +1197,7 @@ async function confirmarReserva(){
   if(reservarModoEspera){
     res=await conReintentoAuth(()=>sb.rpc('reservar_lugar',{p_lugar_id:reservarLugaresIds[0],p_vendedor:vendedorNombre,p_apellido:apellido,p_nombre:nombre}),'RPC reservar_lugar');
   } else {
-    res=await conReintentoAuth(()=>sb.rpc('reservar_lugares',{p_vuelo_id:reservarVueloId,p_cantidad:cantidad,p_vendedor:vendedorNombre,p_apellido:apellido,p_nombre:nombre,p_excluir_operaciones:currentRol!=='admin'}),'RPC reservar_lugares');
+    res=await conReintentoAuth(()=>sb.rpc('reservar_lugares',{p_vuelo_id:reservarVueloId,p_cantidad:cantidad,p_vendedor:vendedorNombre,p_apellido:apellido,p_nombre:nombre,p_excluir_operaciones:rolEfectivo!=='admin'}),'RPC reservar_lugares');
   }
   setBtnLoading('btn-confirmar-reserva',false,'Confirmar reserva');
   if(res?.error){console.error('[Reserva] RPC error',res.error);mostrarAlerta('modal-r-alert','Error al reservar: '+res.error.message,'error');return;}
