@@ -512,7 +512,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-08 (b7 · header)';
+const APP_VERSION='Fase 2 · 2026-06-08 (b8 · fixes baratos)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (tomada del sitio guamatur.com)
@@ -666,7 +666,7 @@ function vencimientoReserva(s,esC){
 function horasDesde(s){if(!s)return null;return Math.round((ahoraUY()-new Date(s))/(1000*60*60))}
 function mostrarAlerta(id,msg,tipo){
   const el=document.getElementById(id);if(!el)return;
-  el.innerHTML=`<div class="alert alert-${tipo}">${msg}</div>`;
+  el.innerHTML=`<div class="alert alert-${tipo}">${esc(msg)}</div>`;
   if(tipo==='success')setTimeout(()=>{el.innerHTML=''},3000);
 }
 function cerrarModal(id){document.getElementById(id).style.display='none'}
@@ -697,7 +697,7 @@ async function cargarDashboard(){
   const [{data:temps},{data:vuelos},{data:pasajerosDash},{data:cancelsDash}]=await Promise.all([
     sb.from('temporadas').select('*').order('creado_en',{ascending:false}),
     sb.from('vista_vuelos').select('*'),
-    sb.from('pasajeros').select('status,vendedor,vuelo_id,cancelado'),
+    sb.from('pasajeros').select('status,vendedor,vuelo_id,lugares(reducido,es_espera)'),
     sb.from('cancelaciones').select('penalidad_usd,recupero_usd,vuelo_id')
   ]);
   if(!vuelos){cont.innerHTML='<div class="loading" style="color:var(--red)">Error</div>';return;}
@@ -720,7 +720,12 @@ async function cargarDashboard(){
 
   // Ranking vendedores
   const rankMap={};
-  (pasajerosDash||[]).filter(p=>vueloIds.has(p.vuelo_id)&&p.status==='V'&&p.vendedor).forEach(p=>{
+  (pasajerosDash||[]).filter(p=>{
+    if(!vueloIds.has(p.vuelo_id)||p.status!=='V'||!p.vendedor) return false;
+    // Excluir lugares reducidos / de espera para que coincida con el KPI "Vendidos"
+    const lug=Array.isArray(p.lugares)?p.lugares[0]:p.lugares;
+    return !lug||(!lug.reducido&&!lug.es_espera);
+  }).forEach(p=>{
     rankMap[p.vendedor]=(rankMap[p.vendedor]||0)+1;
   });
   const ranking=Object.entries(rankMap).sort((a,b)=>b[1]-a[1]);
@@ -782,9 +787,13 @@ async function cargarVuelos(){
   cont.innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
   const {data:temps}=await sb.from('temporadas').select('*').order('creado_en',{ascending:false});
   temporadas=temps||[];
-  if(!temporadaActiva&&temporadas.length>0) temporadaActiva=temporadas.find(t=>t.activa)?.id||temporadas[0].id;
-  document.getElementById('temp-selector-wrap').innerHTML=temporadas.map(t=>`<button class="temp-btn ${t.id===temporadaActiva?'active':''}" onclick="seleccionarTemporada('${t.id}')">${esc(t.nombre)}</button>`).join('');
-  if(!temporadaActiva){cont.innerHTML='<div class="loading">No hay temporadas creadas</div>';return;}
+  // Vendedor solo ve temporadas activas; admin las ve todas (para gestionarlas)
+  const tempsVisibles=(rolEfectivo==='admin')?temporadas:temporadas.filter(t=>t.activa);
+  // Si la temporada seleccionada ya no es visible para este rol, reelegir
+  if(temporadaActiva&&!tempsVisibles.some(t=>t.id===temporadaActiva)) temporadaActiva=null;
+  if(!temporadaActiva&&tempsVisibles.length>0) temporadaActiva=tempsVisibles.find(t=>t.activa)?.id||tempsVisibles[0].id;
+  document.getElementById('temp-selector-wrap').innerHTML=tempsVisibles.map(t=>`<button class="temp-btn ${t.id===temporadaActiva?'active':''}" onclick="seleccionarTemporada('${t.id}')">${esc(t.nombre)}${(rolEfectivo==='admin'&&!t.activa)?' <span class="badge badge-l" style="font-size:9px">inactiva</span>':''}</button>`).join('');
+  if(!temporadaActiva){cont.innerHTML=`<div class="loading">No hay temporadas ${rolEfectivo==='admin'?'creadas':'activas'}</div>`;return;}
   let qv=sb.from('vista_vuelos').select('*').eq('temporada_id',temporadaActiva);
   if(rolEfectivo!=='admin') qv=qv.eq('visible',true);
   const {data:vuelos}=await qv.order('nombre');
@@ -808,7 +817,7 @@ function renderVuelos(lista){
     const redu=(d.reducidos>0)?` <span class="badge badge-l" title="${d.reducidos} lugar(es) reducido(s)">−${d.reducidos}</span>`:'';
     html+=`<tr style="cursor:pointer" onclick="goToDetalle('${d.id}')">
       <td style="color:var(--accent2);font-weight:500">${esc(d.nombre)}${oculto}${redu}</td>
-      <td><span class="badge badge-${d.destino==='Brasil'?'green':'orange'}">${esc(d.destino)||'—'}</span></td>
+      <td><span class="badge ${regionBadge(d.destino)}">${esc(d.destino)||'—'}</span></td>
       <td>${esc(d.ciudad_nombre)||'—'}</td>
       <td>${d.fecha?formatFecha(d.fecha):'—'}</td>
       <td>${d.tot}</td>
@@ -1136,9 +1145,11 @@ async function guardarPasajero(){
         const fechaNacInf=document.getElementById('pi-fecha-nac').value||null;
         // Validación INFANT: debe tener menos de 24 meses a la fecha del cupo (si no, es CHILD)
         if(fechaNacInf&&currentVueloFecha){
-          const nac=new Date(fechaNacInf),dep=new Date(currentVueloFecha);
-          let meses=(dep.getFullYear()-nac.getFullYear())*12+(dep.getMonth()-nac.getMonth());
-          if(dep.getDate()<nac.getDate()) meses--;
+          // Parsear como números (no Date) para evitar el corrimiento UTC→local de "YYYY-MM-DD"
+          const [ny,nm,nd]=fechaNacInf.slice(0,10).split('-').map(Number);
+          const [dy,dm,dd]=String(currentVueloFecha).slice(0,10).split('-').map(Number);
+          let meses=(dy-ny)*12+(dm-nm);
+          if(dd<nd) meses--;
           if(meses>=24){
             setBtnLoading('btn-guardar-pasajero',false,'Guardar');
             mostrarAlerta('modal-p-alert',`A la fecha del cupo tendría ${Math.floor(meses/12)} año(s) y ${meses%12} mes(es): ya NO califica como INFANT y ocupa un asiento. Revisá la fecha de nacimiento.`,'error');
@@ -1396,20 +1407,20 @@ async function abrirModalCancelar(vueloId){
   document.getElementById('btn-confirmar-cancelar').disabled=false;
   document.getElementById('btn-confirmar-cancelar').textContent='Confirmar cancelación';
   // Cargar lugares del vuelo
-  const {data:lugares}=await sb.from('lugares').select('*,pasajeros(id,status,cancelado,primer_apellido,primer_nombre)').eq('vuelo_id',vueloId).eq('es_infant',false).eq('es_espera',false).order('numero_lugar');
+  const {data:lugares}=await sb.from('lugares').select('*,pasajeros(id,status,primer_apellido,primer_nombre)').eq('vuelo_id',vueloId).eq('es_infant',false).eq('es_espera',false).eq('reducido',false).order('numero_lugar');
   cancelarLugaresList=lugares||[];
   const lista=document.getElementById('c-lugares-lista');
   lista.innerHTML=cancelarLugaresList.map(l=>{
     const p=l.pasajeros?.[0];
-    const cancelado=p?.cancelado;
     const st=p?.status||'L';
+    const ocupado=!!(p&&st!=='L');
     const nombre=p?.primer_apellido?esc(`${p.primer_apellido} ${p.primer_nombre||''}`.trim()):'(Libre)';
-    const stBadge=cancelado?'<span class="badge badge-yellow">CANCEL</span>':st==='V'?'<span class="badge badge-v">V</span>':st==='R'?'<span class="badge badge-r">R</span>':'<span class="badge badge-l">L</span>';
+    const stBadge=st==='V'?'<span class="badge badge-v">V</span>':st==='R'?'<span class="badge badge-r">R</span>':'<span class="badge badge-l">L</span>';
     return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border)">
-      <input type="checkbox" id="chk-${l.id}" value="${l.id}" ${cancelado?'disabled checked':''} style="width:16px;height:16px;cursor:pointer"/>
+      <input type="checkbox" id="chk-${l.id}" value="${l.id}" ${ocupado?'':'disabled'} style="width:16px;height:16px;cursor:${ocupado?'pointer':'not-allowed'}"/>
       <span style="font-family:'DM Mono',monospace;font-weight:500;min-width:24px">${l.numero_lugar}</span>
       ${stBadge}
-      <span style="font-size:13px;color:${cancelado?'var(--muted)':'var(--text)'}">${nombre}</span>
+      <span style="font-size:13px;color:${ocupado?'var(--text)':'var(--muted)'}">${nombre}</span>
     </div>`;
   }).join('');
   document.getElementById('modal-cancelar').style.display='flex';
@@ -1425,7 +1436,9 @@ function seleccionarTodosLugares(){
 async function confirmarCancelacion(){
   const seleccionados=cancelarLugaresList.filter(l=>{
     const chk=document.getElementById(`chk-${l.id}`);
-    return chk&&chk.checked&&!chk.disabled;
+    const p=l.pasajeros?.[0];
+    // Solo lugares OCUPADOS: cancelar un libre insertaría una cancelación falsa
+    return chk&&chk.checked&&!chk.disabled&&p&&p.status!=='L';
   });
   if(!seleccionados.length){mostrarAlerta('modal-c-alert','Seleccioná al menos un lugar','error');return;}
   setBtnLoading('btn-confirmar-cancelar',true,'Confirmar cancelación');
