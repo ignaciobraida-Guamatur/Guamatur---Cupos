@@ -76,7 +76,7 @@
   .stat{text-align:center;min-width:50px}
   .stat-val{font-size:18px;font-weight:600;font-family:'DM Mono',monospace}
   .stat-label{font-size:10px;color:var(--muted);text-transform:uppercase}
-  .detalle-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap}
+  .detalle-header{display:flex;flex-direction:column;align-items:stretch;margin-bottom:16px;gap:12px}
   .detalle-titulo{font-size:20px;font-weight:600;margin-bottom:4px}
   .detalle-meta{font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:6px}
   .detalle-actions{display:flex;gap:8px;flex-wrap:wrap}
@@ -512,7 +512,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-08 (b6 · ajustes)';
+const APP_VERSION='Fase 2 · 2026-06-08 (b7 · header)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (tomada del sitio guamatur.com)
