@@ -231,6 +231,7 @@
     <div class="admin-card">
       <div class="admin-card-title">Cupos</div>
       <button class="btn btn-primary" style="width:100%" onclick="abrirModalVuelo()">+ Nuevo cupo</button>
+      <button class="btn btn-outline" style="width:100%;margin-top:8px" onclick="abrirModalMasivo()">⚡ Crear masivos (pegar PNRs)</button>
       <div id="admin-vuelos" style="margin-top:12px"></div>
     </div>
     <div class="admin-card">
@@ -496,6 +497,31 @@
   </div>
 </div>
 
+<!-- MODAL CREAR MASIVO (pegar PNRs) -->
+<div id="modal-masivo" class="modal-overlay" style="display:none">
+  <div class="modal" style="max-width:1000px">
+    <div class="modal-title">Crear cupos masivos — pegar PNRs</div>
+    <div id="modal-m-alert"></div>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">Temporada (para todos)</label><select class="form-select" id="m-temporada"></select></div>
+      <div class="form-group"><label class="form-label">Total lugares por defecto <span style="color:var(--muted);font-size:10px">si el PNR no lo trae</span></label><input class="form-input" id="m-default-lugares" type="number" min="1" value="20"/></div>
+    </div>
+    <div class="form-group full">
+      <label class="form-label">Pegá uno o varios PNRs (separados por una línea en blanco)</label>
+      <textarea class="form-textarea" id="m-pnr" placeholder="Pegá acá los PNRs. Ej:&#10;RF *LA -GMMHDV&#10;  1  LA8119 X 08OCT 4*MVDGRU GN21 0215 0455&#10;  2  LA8112 X 08OCT 4*GRUMEX GN21 0845 1455&#10;&#10;(otro PNR...)" style="min-height:120px;font-family:'DM Mono',monospace;font-size:12px"></textarea>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <button type="button" class="btn btn-outline" onclick="interpretarPNRs()">Interpretar PNRs</button>
+      <span id="m-parse-msg" style="font-size:12px"></span>
+    </div>
+    <div id="m-preview"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="cerrarModal('modal-masivo')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-crear-masivo" onclick="crearCuposMasivos()" style="display:none">Crear cupos</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqeGR5c21lZ2J6Y3JnYXJjbXd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMjM0MjQsImV4cCI6MjA5MTU5OTQyNH0.q1ikAwWW7PVM80Hpmgv01iIvODdv8fOBco8aATb5tAQ',{
   auth:{
@@ -507,7 +533,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-09 (b10 · marca oficial)';
+const APP_VERSION='Fase 2 · 2026-06-09 (b11 · cupos masivos PNR)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (manual oficial — ver 00 - Sistema/referencias/marca-guamatur/)
@@ -1953,6 +1979,155 @@ function obtenerItinerario(){
     if(f)tramos.push({tipo:document.getElementById(`t-t-${i}`)?.value||'Ida',fecha:f,aerolinea:document.getElementById(`t-a-${i}`)?.value||'',vuelo:document.getElementById(`t-v-${i}`)?.value||'',origen:document.getElementById(`t-o-${i}`)?.value||'',destino:document.getElementById(`t-d-${i}`)?.value||'',salida:document.getElementById(`t-s-${i}`)?.value||'',llegada:document.getElementById(`t-l-${i}`)?.value||''});
   });
   return tramos;
+}
+
+// ── CREAR CUPOS MASIVOS (pegar PNRs) ──────────────
+const IATA_CIUDAD={}; CIUDADES.forEach(c=>{IATA_CIUDAD[c.cod]={ciudad:c.nom,region:c.reg};});
+const MES_NUM={ENE:1,JAN:1,FEB:2,MAR:3,ABR:4,APR:4,MAY:5,JUN:6,JUL:7,AGO:8,AUG:8,SEP:9,SET:9,OCT:10,NOV:11,DIC:12,DEC:12};
+let cuposMasivosDraft=[];
+
+async function abrirModalMasivo(){
+  const {data:temps}=await sb.from('temporadas').select('*').order('creado_en',{ascending:false});
+  document.getElementById('m-temporada').innerHTML=(temps||[]).map(t=>`<option value="${t.id}"${t.id===temporadaActiva?' selected':''}>${esc(t.nombre)}</option>`).join('');
+  document.getElementById('m-pnr').value='';
+  document.getElementById('m-preview').innerHTML='';
+  document.getElementById('m-parse-msg').textContent='';
+  document.getElementById('modal-m-alert').innerHTML='';
+  document.getElementById('btn-crear-masivo').style.display='none';
+  document.getElementById('modal-masivo').style.display='flex';
+}
+
+// Fecha ISO con año inferido (si ya pasó este año, usa el próximo)
+function fechaISOInferida(dia,monUpper){
+  const m=MES_NUM[monUpper]; if(!m||!dia) return '';
+  const hoy=ahoraUY();
+  const hoy0=new Date(Date.UTC(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()));
+  let y=hoy.getFullYear();
+  if(new Date(Date.UTC(y,m-1,dia))<hoy0) y++;
+  return `${y}-${String(m).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+}
+
+// Parsea el texto en varios PNRs (bloques separados por línea en blanco) → drafts de cupo
+function parsearPNRs(texto){
+  const bloques=String(texto||'').split(/\n\s*\n/).map(b=>b.trim()).filter(Boolean);
+  const drafts=[];
+  bloques.forEach(bloque=>{
+    const tramos=[];
+    bloque.split(/\r?\n/).forEach(l=>{
+      const t=parsearLineaItinerario(l);
+      if(t&&(t.origen||t.vuelo)){
+        const mD=l.toUpperCase().match(/\b(\d{1,2})\s?([A-Z]{3})\b/);
+        t._dia=mD?parseInt(mD[1],10):null; t._mon=mD?mD[2]:null;
+        tramos.push(t);
+      }
+    });
+    if(!tramos.length) return;
+    const B=bloque.toUpperCase();
+    // Asientos: número tras el estado (GN/HK/etc.), tomamos el máximo
+    let asientos=0;
+    for(const m of B.matchAll(/\b(?:GN|HK|HL|KK|HN|SS|TK|GK|PN|HS|RR|UN)(\d{1,3})\b/g)) asientos=Math.max(asientos,parseInt(m[1],10));
+    // Localizador: token de 6 letras que no sea un par de aeropuertos (orig+dest)
+    const pares=new Set(tramos.map(t=>`${t.origen}${t.destino}`));
+    let localizador='';
+    for(const m of B.matchAll(/\b([A-Z]{6})\b/g)){ if(!pares.has(m[1])){ localizador=m[1]; break; } }
+    const aerolinea=(tramos.find(t=>t.aerolinea)||{}).aerolinea||'';
+    // Destino del viaje: arribo del último tramo del primer día (ida)
+    const ida=tramos.filter(t=>t.fecha===tramos[0].fecha);
+    const destArr=((ida.length?ida[ida.length-1]:tramos[0]).destino)||'';
+    const map=IATA_CIUDAD[destArr]||null;
+    const ciudad=map?map.ciudad:'';
+    const region=map?map.region:'Otros';
+    const fechaISO=fechaISOInferida(tramos[0]._dia,tramos[0]._mon);
+    const ffmt=fechaISO?fechaISO.split('-').reverse().join('/'):'';
+    const nombre=[ciudad?tcCiudad(ciudad):(destArr||''),aerolinea,ffmt].filter(Boolean).join(' - ');
+    const itinerario=tramos.map(t=>({tipo:t.tipo||'Ida',fecha:t.fecha||'',aerolinea:t.aerolinea||'',vuelo:t.vuelo||'',origen:t.origen||'',destino:t.destino||'',salida:t.salida||'',llegada:t.llegada||''}));
+    drafts.push({nombre,region,ciudad,ciudad_codigo:destArr,aerolinea,fecha:fechaISO,localizador,total_lugares:asientos||0,precio:'',precio_neto:'',itinerario,incluir:true});
+  });
+  return drafts;
+}
+
+function interpretarPNRs(){
+  const txt=document.getElementById('m-pnr').value;
+  const msg=document.getElementById('m-parse-msg');
+  if(!txt.trim()){msg.style.color='var(--red)';msg.textContent='Pegá al menos un PNR.';return;}
+  cuposMasivosDraft=parsearPNRs(txt);
+  const prev=document.getElementById('m-preview');
+  if(!cuposMasivosDraft.length){msg.style.color='var(--red)';msg.textContent='No pude detectar PNRs. Revisá el formato.';prev.innerHTML='';document.getElementById('btn-crear-masivo').style.display='none';return;}
+  const defLug=parseInt(document.getElementById('m-default-lugares').value)||0;
+  msg.style.color='var(--green)';msg.textContent=`${cuposMasivosDraft.length} cupo(s) detectado(s). Revisá y ajustá antes de crear.`;
+  renderPreviewMasivo(defLug);
+  document.getElementById('btn-crear-masivo').style.display='';
+}
+
+function renderPreviewMasivo(defLug){
+  const regiones=['Brasil','Caribe','Chile','Otros'];
+  let html='<div class="table-wrap" style="margin-bottom:14px"><table><thead><tr><th>✓</th><th>Nombre</th><th>Región</th><th>Ciudad</th><th>Aerolínea</th><th>Fecha</th><th>Localiz.</th><th>Lugares</th><th>Precio</th><th>Neto</th><th>Tramos</th></tr></thead><tbody>';
+  cuposMasivosDraft.forEach((d,i)=>{
+    const lug=d.total_lugares||defLug||'';
+    html+=`<tr>
+      <td><input type="checkbox" id="m-inc-${i}" ${d.incluir?'checked':''} style="width:15px;height:15px"/></td>
+      <td><input class="form-input" id="m-nom-${i}" value="${esc(d.nombre)}" style="min-width:170px;padding:5px 8px;font-size:12px"/></td>
+      <td><select class="form-select" id="m-reg-${i}" style="padding:5px 8px;font-size:12px">${regiones.map(r=>`<option${r===d.region?' selected':''}>${r}</option>`).join('')}</select></td>
+      <td><input class="form-input" id="m-ciu-${i}" value="${esc(d.ciudad||d.ciudad_codigo||'')}" style="min-width:100px;padding:5px 8px;font-size:12px"/></td>
+      <td><input class="form-input" id="m-aer-${i}" value="${esc(d.aerolinea)}" style="min-width:85px;padding:5px 8px;font-size:12px"/></td>
+      <td><input class="form-input" id="m-fec-${i}" type="date" value="${esc(d.fecha)}" style="padding:5px 8px;font-size:12px"/></td>
+      <td><input class="form-input" id="m-loc-${i}" value="${esc(d.localizador)}" style="width:78px;padding:5px 8px;font-size:12px"/></td>
+      <td><input class="form-input" id="m-lug-${i}" type="number" min="1" value="${lug}" style="width:62px;padding:5px 8px;font-size:12px"/></td>
+      <td><input class="form-input" id="m-pre-${i}" type="number" min="0" value="${d.precio}" placeholder="—" style="width:68px;padding:5px 8px;font-size:12px"/></td>
+      <td><input class="form-input" id="m-net-${i}" type="number" min="0" value="${d.precio_neto}" placeholder="—" style="width:68px;padding:5px 8px;font-size:12px"/></td>
+      <td style="text-align:center;color:var(--muted)">${d.itinerario.length}</td>
+    </tr>`;
+  });
+  html+='</tbody></table></div><div style="font-size:11px;color:var(--muted);margin-bottom:8px">Revisá especialmente Ciudad/Región (cuando el destino es un paquete) y el total de lugares. Destildá los que no quieras crear.</div>';
+  document.getElementById('m-preview').innerHTML=html;
+}
+
+async function crearCuposMasivos(){
+  const temporada_id=document.getElementById('m-temporada').value;
+  if(!temporada_id){mostrarAlerta('modal-m-alert','Seleccioná una temporada','error');return;}
+  const filas=[];
+  cuposMasivosDraft.forEach((d,i)=>{
+    if(!document.getElementById(`m-inc-${i}`)?.checked) return;
+    filas.push({
+      nombre:document.getElementById(`m-nom-${i}`).value.trim(),
+      destino:document.getElementById(`m-reg-${i}`).value||null,
+      ciudad_nombre:document.getElementById(`m-ciu-${i}`).value.trim(),
+      ciudad_codigo:d.ciudad_codigo||'',
+      aerolinea:document.getElementById(`m-aer-${i}`).value.trim()||null,
+      fecha:document.getElementById(`m-fec-${i}`).value||null,
+      localizador:document.getElementById(`m-loc-${i}`).value.trim()||null,
+      total_lugares:parseInt(document.getElementById(`m-lug-${i}`).value)||0,
+      precio:parseFloat(document.getElementById(`m-pre-${i}`).value)||null,
+      precio_neto:parseFloat(document.getElementById(`m-net-${i}`).value)||null,
+      itinerario:d.itinerario
+    });
+  });
+  if(!filas.length){mostrarAlerta('modal-m-alert','Marcá al menos un cupo para crear','error');return;}
+  const malos=filas.filter(f=>!f.nombre||!f.total_lugares||f.total_lugares<1);
+  if(malos.length){mostrarAlerta('modal-m-alert',`${malos.length} cupo(s) sin nombre o sin total de lugares. Completalos.`,'error');return;}
+  setBtnLoading('btn-crear-masivo',true,'Crear cupos');
+  await asegurarTokenFresco();
+  let ok=0; const errores=[];
+  for(const f of filas){
+    try{
+      const datos={temporada_id,nombre:f.nombre,destino:f.destino,ciudad_codigo:f.ciudad_codigo,ciudad_nombre:f.ciudad_nombre,aerolinea:f.aerolinea,localizador:f.localizador,fecha:f.fecha,precio:f.precio,precio_neto:f.precio_neto,visible:true,itinerario:f.itinerario.length?f.itinerario:null,total_lugares:f.total_lugares};
+      const {data:vuelo,error}=await conReintentoAuth(()=>sb.from('vuelos').insert(datos).select().single(),'INSERT cupo masivo');
+      if(error){errores.push(`${f.nombre}: ${error.message}`);continue;}
+      const {error:eLug}=await sb.from('lugares').insert(Array.from({length:f.total_lugares},(_,k)=>({vuelo_id:vuelo.id,numero_lugar:k+1,es_infant:false})));
+      if(eLug){errores.push(`${f.nombre}: lugares ${eLug.message}`);continue;}
+      await recalcularBloqueoOperaciones(vuelo.id);
+      await sb.from('lugares').insert(Array.from({length:6},(_,k)=>({vuelo_id:vuelo.id,numero_lugar:k+1,es_infant:false,es_espera:true})));
+      await registrarLog('crear_cupo','vuelo',vuelo.id,{nombre:f.nombre,total:f.total_lugares,via:'masivo'});
+      ok++;
+    }catch(e){errores.push(`${f.nombre}: ${e.message}`);}
+  }
+  setBtnLoading('btn-crear-masivo',false,'Crear cupos');
+  if(errores.length){
+    mostrarAlerta('modal-m-alert',`Creados ${ok}/${filas.length}. Errores: ${errores.join(' | ')}`,ok>0?'success':'error');
+  }else{
+    mostrarAlerta('modal-m-alert',`${ok} cupo(s) creado(s) correctamente`,'success');
+    setTimeout(()=>{cerrarModal('modal-masivo');cargarAdmin();},1300);
+  }
 }
 
 // ── AUTH ─────────────────────────────────────────
