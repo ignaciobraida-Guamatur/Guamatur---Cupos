@@ -532,7 +532,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-10 (b16 · seguridad usuarios RPC)';
+const APP_VERSION='Fase 2 · 2026-06-10 (b17 · seguridad pasajeros RPC)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (manual oficial — ver 00 - Sistema/referencias/marca-guamatur/)
@@ -1161,92 +1161,65 @@ async function guardarPasajero(){
   // Auto-promoción a Vendido: una reserva con factura + ficha cargadas pasa de R a V
   if(status==='R'&&factura&&ficha) status='V';
   if(status==='V'&&!factura){mostrarAlerta('modal-p-alert','Factura obligatoria para status V','error');return;}
+  // INFANT: leer y validar ANTES de guardar (el alta pasajero+infant es atómica en la RPC)
+  const tieneInfant=document.getElementById('p-tiene-infant').checked;
+  let infObj=null;
+  if(tieneInfant){
+    const apellido1Inf=document.getElementById('pi-apellido1').value.trim();
+    const apellido2Inf=document.getElementById('pi-apellido2').value.trim();
+    const nombre1Inf=document.getElementById('pi-nombre1').value.trim();
+    const nombre2Inf=document.getElementById('pi-nombre2').value.trim();
+    const fechaNacInf=document.getElementById('pi-fecha-nac').value||null;
+    // Validación INFANT: debe tener menos de 24 meses a la fecha del cupo (si no, es CHILD)
+    if(fechaNacInf&&currentVueloFecha){
+      // Parsear como números (no Date) para evitar el corrimiento UTC→local de "YYYY-MM-DD"
+      const [ny,nm,nd]=fechaNacInf.slice(0,10).split('-').map(Number);
+      const [dy,dm,dd]=String(currentVueloFecha).slice(0,10).split('-').map(Number);
+      let meses=(dy-ny)*12+(dm-nm);
+      if(dd<nd) meses--;
+      if(meses>=24){mostrarAlerta('modal-p-alert',`A la fecha del cupo tendría ${Math.floor(meses/12)} año(s) y ${meses%12} mes(es): ya NO califica como INFANT y ocupa un asiento. Revisá la fecha de nacimiento.`,'error');return;}
+    }
+    // Validación según status: V exige los 4 campos; R/L alcanza con primer apellido o nombre
+    if(status==='V'){
+      if(!apellido1Inf||!apellido2Inf||!nombre1Inf||!nombre2Inf){mostrarAlerta('modal-p-alert','Para status V, el INFANT requiere los 4 campos (ambos apellidos y nombres)','error');return;}
+    } else {
+      if(!apellido1Inf&&!nombre1Inf){mostrarAlerta('modal-p-alert','Completá al menos primer apellido o primer nombre del infant','error');return;}
+    }
+    infObj={primer_apellido:apellido1Inf,segundo_apellido:apellido2Inf||null,primer_nombre:nombre1Inf,segundo_nombre:nombre2Inf||null,fecha_nacimiento:fechaNacInf};
+  }
+  // Fecha de reserva: admin la maneja desde el formulario; para no-admin la computa la RPC (server-side).
+  let pFecha=null;
+  if(rolEfectivo==='admin'){
+    const fechaManual=document.getElementById('p-fecha-reserva').value;
+    if(fechaManual) pFecha=fromDatetimeLocal(fechaManual);
+    else if(!currentPasajeroId&&status==='R') pFecha=ahoraUY().toISOString();
+    else pFecha=null;
+  }
   setBtnLoading('btn-guardar-pasajero',true);
   await asegurarTokenFresco();
   try{
-    const datos={
-      lugar_id:currentLugarId,vuelo_id:currentVueloId,
-      primer_apellido:document.getElementById('p-apellido1').value,
-      segundo_apellido:document.getElementById('p-apellido2').value,
-      primer_nombre:document.getElementById('p-nombre1').value,
-      segundo_nombre:document.getElementById('p-nombre2').value,
-      hotel:document.getElementById('p-hotel').value,
-      vendedor:document.getElementById('p-vendedor').value,
-      ficha:ficha||null,
-      comentarios:document.getElementById('p-comentarios').value.trim()||null,
-      status,factura:factura||null,cancelado:false,aviso_vencimiento_enviado:false,actualizado_en:new Date().toISOString()
-    };
-    // Fecha de reserva: admin puede editarla; si no, se setea automáticamente al crear una R
-    if(rolEfectivo==='admin'){
-      const fechaManual=document.getElementById('p-fecha-reserva').value;
-      if(fechaManual){
-        datos.fecha_reserva=fromDatetimeLocal(fechaManual);
-      } else if(!currentPasajeroId&&status==='R'){
-        datos.fecha_reserva=ahoraUY().toISOString();
-      } else if(!currentPasajeroId){
-        datos.fecha_reserva=null;
-      }
-      // Si es edición y el admin borró el campo, dejar null
-      if(currentPasajeroId&&!fechaManual) datos.fecha_reserva=null;
-    } else {
-      if(!currentPasajeroId&&status==='R') datos.fecha_reserva=ahoraUY().toISOString();
-    }
-    let pasajeroId=currentPasajeroId,error;
-    if(currentPasajeroId){
-      ({error}=await sb.from('pasajeros').update(datos).eq('id',currentPasajeroId));
-    } else {
-      const {data:np,error:e}=await sb.from('pasajeros').insert(datos).select().single();
-      error=e;if(np)pasajeroId=np.id;
-    }
+    // Write por RPC SECURITY DEFINER: fuerza ownership (vendedor solo lugar libre/propio) y
+    // atribución del vendedor por JWT; el infant se upserta/borra en la misma transacción.
+    const {data:pid,error}=await sb.rpc('guardar_pasajero',{
+      p_pasajero_id:currentPasajeroId,
+      p_lugar_id:currentLugarId,
+      p_vuelo_id:currentVueloId,
+      p_primer_apellido:document.getElementById('p-apellido1').value,
+      p_segundo_apellido:document.getElementById('p-apellido2').value,
+      p_primer_nombre:document.getElementById('p-nombre1').value,
+      p_segundo_nombre:document.getElementById('p-nombre2').value,
+      p_hotel:document.getElementById('p-hotel').value,
+      p_vendedor:document.getElementById('p-vendedor').value,
+      p_ficha:ficha||null,
+      p_comentarios:document.getElementById('p-comentarios').value.trim()||null,
+      p_status:status,
+      p_factura:factura||null,
+      p_fecha_reserva:pFecha,
+      p_tiene_infant:tieneInfant,
+      p_inf:infObj
+    });
     if(error){console.error('[Pasajero] Error guardar:',error);setBtnLoading('btn-guardar-pasajero',false,'Guardar');mostrarAlerta('modal-p-alert','Error al guardar pasajero: '+error.message,'error');return;}
-    const tieneInfant=document.getElementById('p-tiene-infant').checked;
-    if(pasajeroId){
-      if(tieneInfant){
-        const apellido1Inf=document.getElementById('pi-apellido1').value.trim();
-        const apellido2Inf=document.getElementById('pi-apellido2').value.trim();
-        const nombre1Inf=document.getElementById('pi-nombre1').value.trim();
-        const nombre2Inf=document.getElementById('pi-nombre2').value.trim();
-        const fechaNacInf=document.getElementById('pi-fecha-nac').value||null;
-        // Validación INFANT: debe tener menos de 24 meses a la fecha del cupo (si no, es CHILD)
-        if(fechaNacInf&&currentVueloFecha){
-          // Parsear como números (no Date) para evitar el corrimiento UTC→local de "YYYY-MM-DD"
-          const [ny,nm,nd]=fechaNacInf.slice(0,10).split('-').map(Number);
-          const [dy,dm,dd]=String(currentVueloFecha).slice(0,10).split('-').map(Number);
-          let meses=(dy-ny)*12+(dm-nm);
-          if(dd<nd) meses--;
-          if(meses>=24){
-            setBtnLoading('btn-guardar-pasajero',false,'Guardar');
-            mostrarAlerta('modal-p-alert',`A la fecha del cupo tendría ${Math.floor(meses/12)} año(s) y ${meses%12} mes(es): ya NO califica como INFANT y ocupa un asiento. Revisá la fecha de nacimiento.`,'error');
-            return;
-          }
-        }
-        // Validación según status: V exige los 4 campos; R/L alcanza con primer apellido o nombre
-        if(status==='V'){
-          if(!apellido1Inf||!apellido2Inf||!nombre1Inf||!nombre2Inf){
-            setBtnLoading('btn-guardar-pasajero',false,'Guardar');
-            mostrarAlerta('modal-p-alert','Para status V, el INFANT requiere los 4 campos (ambos apellidos y nombres)','error');
-            return;
-          }
-        } else {
-          if(!apellido1Inf&&!nombre1Inf){
-            setBtnLoading('btn-guardar-pasajero',false,'Guardar');
-            mostrarAlerta('modal-p-alert','Completá al menos primer apellido o primer nombre del infant','error');
-            return;
-          }
-        }
-        const infantData={vuelo_id:currentVueloId,pasajero_id:pasajeroId,primer_apellido:apellido1Inf,segundo_apellido:apellido2Inf||null,primer_nombre:nombre1Inf,segundo_nombre:nombre2Inf||null,fecha_nacimiento:fechaNacInf};
-        const {data:inf,error:errSelInf}=await sb.from('infants').select('id').eq('pasajero_id',pasajeroId).maybeSingle();
-        if(errSelInf){console.error('[Infant] Error SELECT:',errSelInf);setBtnLoading('btn-guardar-pasajero',false,'Guardar');mostrarAlerta('modal-p-alert','Pasajero guardado, pero error al verificar infant: '+errSelInf.message,'error');return;}
-        let errInf;
-        if(inf){({error:errInf}=await sb.from('infants').update(infantData).eq('id',inf.id));}
-        else{({error:errInf}=await sb.from('infants').insert(infantData));}
-        if(errInf){console.error('[Infant] Error guardar:',errInf);setBtnLoading('btn-guardar-pasajero',false,'Guardar');mostrarAlerta('modal-p-alert','Pasajero guardado, pero error al guardar infant: '+errInf.message,'error');return;}
-      } else {
-        const {error:errDel}=await sb.from('infants').delete().eq('pasajero_id',pasajeroId);
-        if(errDel){console.error('[Infant] Error DELETE:',errDel);}
-      }
-    }
-    await registrarLog(currentPasajeroId?'editar_pasajero':'alta_pasajero','pasajero',pasajeroId,{status,vuelo_id:currentVueloId});
+    await registrarLog(currentPasajeroId?'editar_pasajero':'alta_pasajero','pasajero',pid,{status,vuelo_id:currentVueloId});
     setBtnLoading('btn-guardar-pasajero',false,'Guardar');
     mostrarAlerta('modal-p-alert','Guardado correctamente','success');
     setTimeout(()=>{cerrarModal('modal-pasajero');cargarDetalle(currentVueloId)},800);
@@ -1451,12 +1424,13 @@ async function confirmarEliminarReserva(){
   setBtnLoading('btn-confirmar-elim',true,'Eliminar seleccionadas');
   await asegurarTokenFresco();
   const ids=sel.map(l=>l.pasajeros[0].id);
-  await sb.from('infants').delete().in('pasajero_id',ids);
-  const {error}=await sb.from('pasajeros').update({status:'L',cancelado:false,factura:null,fecha_reserva:null,primer_apellido:null,primer_nombre:null,segundo_apellido:null,segundo_nombre:null,hotel:null,vendedor:null,ficha:null,comentarios:null,actualizado_en:new Date().toISOString()}).in('id',ids);
+  // Write por RPC SECURITY DEFINER: respeta ownership (vendedor solo libera las suyas).
+  const {data:liberadas,error}=await sb.rpc('liberar_lugares',{p_ids:ids});
   setBtnLoading('btn-confirmar-elim',false,'Eliminar seleccionadas');
   if(error){mostrarAlerta('modal-elim-alert','Error al eliminar: '+error.message,'error');return;}
   await registrarLog('eliminar_reserva','vuelo',eliminarVueloId,{lugares:sel.map(l=>l.numero_lugar)});
-  mostrarAlerta('modal-elim-alert',`${sel.length} reserva(s) eliminada(s)`,'success');
+  const nLib=(liberadas==null?sel.length:liberadas);
+  mostrarAlerta('modal-elim-alert',`${nLib} reserva(s) eliminada(s)`,'success');
   setTimeout(()=>{cerrarModal('modal-eliminar');cargarDetalle(eliminarVueloId)},900);
 }
 
@@ -1509,18 +1483,12 @@ async function confirmarCancelacion(){
   await asegurarTokenFresco();
   const penalidad=parseFloat(document.getElementById('c-penalidad').value)||0;
   const recupero=parseFloat(document.getElementById('c-recupero').value)||0;
-  const usuarioActual=vendedores.find(v=>v.email===currentUser?.email)?.nombre||currentUser?.email||'?';
   const errors=[];
   let exitosos=0;
   for(const l of seleccionados){
-    const p=l.pasajeros?.[0];
-    if(p?.id){
-      const upd=await conReintentoAuth(()=>sb.from('pasajeros').update({status:'L',cancelado:false,factura:null,fecha_reserva:null,primer_apellido:null,primer_nombre:null,segundo_apellido:null,segundo_nombre:null,hotel:null,vendedor:null,ficha:null,comentarios:null,aviso_vencimiento_enviado:false,actualizado_en:new Date().toISOString()}).eq('id',p.id),'UPDATE cancelar pasajero');
-      if(upd?.error){console.error('[Cancelar] Error update pasajero:',upd.error);errors.push(`Lugar ${l.numero_lugar}: ${upd.error.message}`);continue;}
-      await sb.from('infants').delete().eq('pasajero_id',p.id);
-    }
-    const ins=await conReintentoAuth(()=>sb.from('cancelaciones').insert({lugar_id:l.id,vuelo_id:cancelarVueloId,penalidad_usd:penalidad,recupero_usd:recupero,usuario:usuarioActual,fecha:new Date().toISOString()}),'INSERT cancelación');
-    if(ins?.error){console.error('[Cancelar] Error insert cancelación:',ins.error);errors.push(`Lugar ${l.numero_lugar}: ${ins.error.message}`);continue;}
+    // Write por RPC SECURITY DEFINER (admin-only): libera + borra infant + registra cancelación, atómico.
+    const r=await conReintentoAuth(()=>sb.rpc('cancelar_lugar',{p_lugar_id:l.id,p_penalidad:penalidad,p_recupero:recupero}),'RPC cancelar_lugar');
+    if(r?.error){console.error('[Cancelar] Error:',r.error);errors.push(`Lugar ${l.numero_lugar}: ${r.error.message}`);continue;}
     exitosos++;
   }
   await registrarLog('cancelar_reserva','vuelo',cancelarVueloId,{lugares:seleccionados.map(l=>l.numero_lugar),penalidad,recupero});
