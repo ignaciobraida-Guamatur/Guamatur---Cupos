@@ -532,7 +532,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-10 (b15 · ocupados arriba sin huecos)';
+const APP_VERSION='Fase 2 · 2026-06-10 (b16 · seguridad usuarios RPC)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (manual oficial — ver 00 - Sistema/referencias/marca-guamatur/)
@@ -615,8 +615,8 @@ async function iniciarSesion(session){
     if(le){le.textContent='La cuenta '+emailNoAuth+' no está autorizada. Pedile acceso a un administrador.';le.style.display='block';}
     return;
   }
-  // Actualizar ID si cambió (primer login de un usuario pre-cargado)
-  if(u.id!==currentUser.id) await sb.from('usuarios').update({id:currentUser.id}).eq('email',currentUser.email);
+  // Sincronizar el ID con el de Google en el primer login (vía RPC; no bloquea el login si falla)
+  if(u.id!==currentUser.id){try{await sb.rpc('sync_mi_usuario_id');}catch(e){console.warn('sync id usuario:',e);}}
   currentRol=u.rol;
   rolEfectivo=u.rol;
   // Cargar vendedores
@@ -1706,14 +1706,12 @@ async function guardarUsuario(){
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){mostrarAlerta('modal-u-alert','Ingresá un email válido','error');return;}
   if(!nombre){mostrarAlerta('modal-u-alert','El nombre es obligatorio','error');return;}
   setBtnLoading('btn-guardar-usuario',true);
-  let error;
-  if(usuarioEditando){
-    ({error}=await sb.from('usuarios').update({nombre,rol}).eq('email',usuarioEditando));
-  } else {
+  if(!usuarioEditando){
     const {data:ya}=await sb.from('usuarios').select('email').eq('email',email).maybeSingle();
     if(ya){setBtnLoading('btn-guardar-usuario',false,'Guardar');mostrarAlerta('modal-u-alert','Ya existe un usuario con ese email','error');return;}
-    ({error}=await sb.from('usuarios').insert({id:crypto.randomUUID(),email,nombre,rol}));
   }
+  // Alta/edición vía RPC con gate de admin server-side (cierra la auto-promoción a admin)
+  const {error}=await sb.rpc('admin_guardar_usuario',{p_email:usuarioEditando||email,p_nombre:nombre,p_rol:rol});
   setBtnLoading('btn-guardar-usuario',false,'Guardar');
   if(error){mostrarAlerta('modal-u-alert',error.message,'error');return;}
   mostrarAlerta('modal-u-alert',usuarioEditando?'Usuario actualizado':'Usuario creado','success');
@@ -1725,7 +1723,7 @@ async function eliminarUsuario(){
   if(usuarioEditando===currentUser?.email){mostrarAlerta('modal-u-alert','No podés eliminar tu propia cuenta','error');return;}
   if(!confirm('¿Quitar el acceso de '+usuarioEditando+'? No podrá ingresar hasta volver a cargarlo.'))return;
   setBtnLoading('btn-guardar-usuario',true);
-  const {error}=await sb.from('usuarios').delete().eq('email',usuarioEditando);
+  const {error}=await sb.rpc('admin_eliminar_usuario',{p_email:usuarioEditando});
   setBtnLoading('btn-guardar-usuario',false,'Guardar');
   if(error){mostrarAlerta('modal-u-alert',error.message,'error');return;}
   cerrarModal('modal-usuario');cargarAdmin();
