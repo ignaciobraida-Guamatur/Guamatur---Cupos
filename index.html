@@ -295,7 +295,6 @@
     <div id="modal-p-alert"></div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="cerrarModal('modal-pasajero')">Cancelar</button>
-      <button class="btn btn-outline" id="btn-imprimir-reserva" style="display:none" onclick="imprimirItinerario(currentVueloId,currentLugarId)">🖨 Itinerario PDF</button>
       <button class="btn btn-primary" id="btn-guardar-pasajero" onclick="guardarPasajero()">Guardar</button>
     </div>
   </div>
@@ -533,7 +532,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-10 (b13 · fix fecha -1 día)';
+const APP_VERSION='Fase 2 · 2026-06-10 (b14 · botón PDF por fila)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (manual oficial — ver 00 - Sistema/referencias/marca-guamatur/)
@@ -1026,6 +1025,9 @@ async function cargarDetalle(vueloId){
     else if(esPropia){accion=`<button class="btn-sm" onclick="abrirModalPasajero('${l.id}',${pJson},'${vuelo.id}',${inf?JSON.stringify(inf).replace(/"/g,'&quot;'):'null'})">Editar</button>`;}
     else if(modo==='espera'&&libreSeat){accion=`<button class="btn-sm" onclick="reservarSlot('${l.id}','${vuelo.id}')">Reservar</button>`;}
     else if(modo==='espera'){accion='—';}
+    // Botón visible "PDF de esta reserva" — solo en lugares con reserva (no en libres ni reducidos)
+    const btnPdf=(p&&st!=='L'&&!cancelado&&modo!=='reducido')?`<button class="btn-sm" title="Itinerario PDF de esta reserva (con fecha y vencimiento)" onclick="event.stopPropagation();imprimirItinerario('${vuelo.id}','${l.id}')">🖨 PDF</button>`:'';
+    const accionCell=[(accion&&accion!=='—')?accion:'',btnPdf].filter(Boolean).join(' ')||accion;
     let h=`<tr class="${rowCls}">
       <td style="font-family:'DM Mono',monospace;font-weight:500">${l.numero_lugar}</td>
       <td>${esc(p?.primer_apellido)||'—'}</td>
@@ -1040,7 +1042,7 @@ async function cargarDetalle(vueloId){
       <td class="${vencido&&st==='R'?'vencimiento-warn':'vencimiento-ok'}">${st==='R'?vText:'—'}</td>
       <td>${esc(p?.ficha)||'—'}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p?.comentarios)}">${esc(p?.comentarios)||'—'}</td>
-      ${hasAccion?`<td>${accion}</td>`:''}
+      ${hasAccion?`<td><div style="display:flex;gap:6px;flex-wrap:wrap">${accionCell}</div></td>`:''}
     </tr>`;
     if(inf){
       const apellidoInf=esc([inf.primer_apellido,inf.segundo_apellido].filter(Boolean).join(' '));
@@ -1081,8 +1083,6 @@ function abrirModalPasajero(lugarId,pasajero,vueloId,infant=null){
   currentLugarId=lugarId;currentVueloId=vueloId;
   const esLibre=!pasajero||!pasajero.id;
   currentPasajeroId=esLibre?null:(pasajero.id||null);
-  // Botón "Itinerario PDF" (por reserva): solo si ya hay una reserva cargada
-  {const btnImp=document.getElementById('btn-imprimir-reserva');if(btnImp)btnImp.style.display=esLibre?'none':'';}
   document.getElementById('p-apellido1').value=esLibre?'':(pasajero.primer_apellido||'');
   document.getElementById('p-apellido2').value=esLibre?'':(pasajero.segundo_apellido||'');
   document.getElementById('p-nombre1').value=esLibre?'':(pasajero.primer_nombre||'');
