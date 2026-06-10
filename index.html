@@ -532,7 +532,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-10 (b14 · botón PDF por fila)';
+const APP_VERSION='Fase 2 · 2026-06-10 (b15 · ocupados arriba sin huecos)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (manual oficial — ver 00 - Sistema/referencias/marca-guamatur/)
@@ -929,7 +929,9 @@ async function cargarDetalle(vueloId){
   if(!vuelo||!lugares){cont.innerHTML='<div class="loading" style="color:var(--red)">Error</div>';return;}
   currentVueloFecha=vuelo.fecha||null;
   const lugaresAdultos=lugares.filter(l=>!l.es_infant&&!l.es_espera);
-  const lugaresActivos=lugaresAdultos.filter(l=>!l.reducido).sort((a,b)=>a.numero_lugar-b.numero_lugar);
+  // Orden visual: ocupados (V/R) arriba, luego libres vendibles, luego los de Operaciones; numeración corrida (sin huecos)
+  const grupoLugar=l=>{const pp=l.pasajeros?.[0];if(pp&&pp.status&&pp.status!=='L')return 0;return l.bloqueado_operaciones?2:1;};
+  const lugaresActivos=lugaresAdultos.filter(l=>!l.reducido).sort((a,b)=>grupoLugar(a)-grupoLugar(b)||a.numero_lugar-b.numero_lugar);
   const lugaresReducidos=lugaresAdultos.filter(l=>l.reducido).sort((a,b)=>a.numero_lugar-b.numero_lugar);
   const lugaresEspera=lugares.filter(l=>l.es_espera).sort((a,b)=>a.numero_lugar-b.numero_lugar);
   const vV=lugaresActivos.filter(l=>l.pasajeros?.[0]?.status==='V').length;
@@ -1005,7 +1007,7 @@ async function cargarDetalle(vueloId){
   }
 
   // Render de una fila de pasajero (reutilizable: activo / reducido / espera)
-  function fila(l,modo,hasAccion,infColspan){
+  function fila(l,modo,hasAccion,infColspan,numVisible){
     const p=l.pasajeros?.[0];
     const st=p?.status||'L';
     const cancelado=p?.cancelado;
@@ -1029,7 +1031,7 @@ async function cargarDetalle(vueloId){
     const btnPdf=(p&&st!=='L'&&!cancelado&&modo!=='reducido')?`<button class="btn-sm" title="Itinerario PDF de esta reserva (con fecha y vencimiento)" onclick="event.stopPropagation();imprimirItinerario('${vuelo.id}','${l.id}')">🖨 PDF</button>`:'';
     const accionCell=[(accion&&accion!=='—')?accion:'',btnPdf].filter(Boolean).join(' ')||accion;
     let h=`<tr class="${rowCls}">
-      <td style="font-family:'DM Mono',monospace;font-weight:500">${l.numero_lugar}</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:500">${numVisible!=null?numVisible:l.numero_lugar}</td>
       <td>${esc(p?.primer_apellido)||'—'}</td>
       <td>${esc(p?.segundo_apellido)||'—'}</td>
       <td>${esc(p?.primer_nombre)||'—'}</td>
@@ -1054,7 +1056,7 @@ async function cargarDetalle(vueloId){
 
   const headPlanilla=`<tr><th>#</th><th>Primer apellido</th><th>Segundo apellido</th><th>Primer nombre</th><th>Segundo nombre</th><th>Hotel</th><th>Vendedor</th><th>Status</th><th>Factura</th><th>Fecha reserva</th><th>Vencimiento</th><th>Ficha</th><th>Comentarios</th><th></th></tr>`;
   html+=`<div class="table-wrap"><table><thead>${headPlanilla}</thead><tbody>`;
-  lugaresActivos.forEach(l=>{html+=fila(l,'activo',true,numCols-1);});
+  lugaresActivos.forEach((l,idx)=>{html+=fila(l,'activo',true,numCols-1,idx+1);});
   if(lugaresReducidos.length){
     html+=`<tr><td colspan="${numCols}" style="background:var(--surface2);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Lugares reducidos (${lugaresReducidos.length})</td></tr>`;
     lugaresReducidos.forEach(l=>{html+=fila(l,'reducido',true,numCols-1);});
@@ -1557,10 +1559,11 @@ async function exportarExcel(vueloId,nombreVuelo){
       }
     };
     // Activos (no infant, no espera, no reducido) primero; luego reducidos; luego lista de espera
-    const adultos=lugares.filter(l=>!l.es_infant&&!l.es_espera&&!l.reducido).sort((a,b)=>a.numero_lugar-b.numero_lugar);
+    const grupoExp=l=>{const pp=l.pasajeros?.[0];if(pp&&pp.status&&pp.status!=='L')return 0;return l.bloqueado_operaciones?2:1;};
+    const adultos=lugares.filter(l=>!l.es_infant&&!l.es_espera&&!l.reducido).sort((a,b)=>grupoExp(a)-grupoExp(b)||a.numero_lugar-b.numero_lugar);
     const reducidos=lugares.filter(l=>!l.es_infant&&!l.es_espera&&l.reducido).sort((a,b)=>a.numero_lugar-b.numero_lugar);
     const espera=lugares.filter(l=>l.es_espera).sort((a,b)=>a.numero_lugar-b.numero_lugar);
-    adultos.forEach(l=>pushFila(l.numero_lugar,'Adulto',l.pasajeros?.[0]||{},(l.pasajeros?.[0]?.cancelado?'CANCEL':(l.pasajeros?.[0]?.status||'L'))));
+    adultos.forEach((l,idx)=>pushFila(idx+1,'Adulto',l.pasajeros?.[0]||{},(l.pasajeros?.[0]?.status||'L')));
     reducidos.forEach(l=>pushFila(l.numero_lugar,'Reducido',l.pasajeros?.[0]||{},'REDUCIDO'));
     espera.forEach(l=>pushFila(`E${l.numero_lugar}`,'Espera',l.pasajeros?.[0]||{},(l.pasajeros?.[0]?.status||'L')));
     const ws=XLSX.utils.aoa_to_sheet(rows);
