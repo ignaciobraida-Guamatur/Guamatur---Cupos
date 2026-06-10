@@ -533,7 +533,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-10 (b12 · PDF fechas + vencimiento 15min)';
+const APP_VERSION='Fase 2 · 2026-06-10 (b13 · fix fecha -1 día)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (manual oficial — ver 00 - Sistema/referencias/marca-guamatur/)
@@ -685,7 +685,10 @@ function goToDetalle(id){
 }
 
 function ahoraUY(){const a=new Date();return new Date(a.getTime()+(a.getTimezoneOffset()+(-3*60))*60000)}
-function formatFecha(s){if(!s)return '—';const d=new Date(s);return isNaN(d)?'—':d.toLocaleDateString('es-UY',{day:'2-digit',month:'2-digit',year:'numeric'})}
+function formatFecha(s){if(!s)return '—';const str=String(s);const md=str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  // Fecha pura YYYY-MM-DD: parsear como local (evita el corrimiento UTC→UY que la mostraba un día antes)
+  const d=md?new Date(+md[1],+md[2]-1,+md[3]):new Date(str);
+  return isNaN(d)?'—':d.toLocaleDateString('es-UY',{day:'2-digit',month:'2-digit',year:'numeric'})}
 // Formatea la fecha de un tramo de itinerario (texto libre) a algo legible: DDMMAAAA→DD/MM/AAAA, "8 oct"→"08 Oct"
 function formatTramoFecha(s){
   if(!s) return '—';
