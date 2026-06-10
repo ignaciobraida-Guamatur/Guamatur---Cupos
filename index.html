@@ -268,7 +268,7 @@
           <option value="V">V — Vendido</option>
         </select>
       </div>
-      <div class="form-group"><label class="form-label">Factura <span style="color:var(--muted)">(req. para V)</span></label><input class="form-input" id="p-factura"/></div>
+      <div class="form-group"><label class="form-label">Factura <span style="color:var(--muted)">(con Ficha cargada → pasa a Vendido)</span></label><input class="form-input" id="p-factura"/></div>
       <div class="form-group" id="p-fecha-reserva-group" style="display:none"><label class="form-label">Fecha de reserva <span style="color:var(--muted)">(admin)</span></label><input class="form-input" id="p-fecha-reserva" type="datetime-local"/></div>
       <div class="form-group full"><label class="form-label">Comentarios <span style="color:var(--muted)">(condiciones legales, observaciones del pasajero)</span></label><textarea class="form-textarea" id="p-comentarios" placeholder="Ej: menor viaja con autorización notarial / pasaporte vence 2027..."></textarea></div>
     </div>
@@ -294,6 +294,7 @@
     <div id="modal-p-alert"></div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="cerrarModal('modal-pasajero')">Cancelar</button>
+      <button class="btn btn-outline" id="btn-imprimir-reserva" style="display:none" onclick="imprimirItinerario(currentVueloId,currentLugarId)">🖨 Itinerario PDF</button>
       <button class="btn btn-primary" id="btn-guardar-pasajero" onclick="guardarPasajero()">Guardar</button>
     </div>
   </div>
@@ -431,18 +432,12 @@
       <div class="form-group full"><label class="form-label">Temporada</label><select class="form-select" id="v-temporada"></select></div>
       <div class="form-group">
         <label class="form-label">Región</label>
-        <select class="form-select" id="v-destino"><option value="">Seleccionar...</option><option value="Brasil">Brasil</option><option value="Caribe">Caribe</option><option value="Chile">Chile</option></select>
+        <select class="form-select" id="v-destino" onchange="onRegionChange()"><option value="">Seleccionar...</option><option value="Brasil">Brasil</option><option value="Caribe">Caribe</option><option value="Chile">Chile</option><option value="Otros">Otros</option></select>
       </div>
       <div class="form-group">
-        <label class="form-label">Ciudad</label>
+        <label class="form-label">Ciudad <span style="color:var(--muted);font-size:10px">elegí la región primero</span></label>
         <select class="form-select" id="v-ciudad" onchange="sugerirNombreCupo()">
           <option value="">Seleccionar...</option>
-          <option value="CUN|CANCÚN">CANCÚN</option><option value="SSA|SALVADOR">SALVADOR</option>
-          <option value="SCL|SANTIAGO DE CHILE">SANTIAGO DE CHILE</option><option value="PMC|PUERTO MONTT">PUERTO MONTT</option>
-          <option value="AUA|ARUBA">ARUBA</option><option value="REC|RECIFE">RECIFE</option>
-          <option value="PUJ|PUNTA CANA">PUNTA CANA</option><option value="GRU|SÃO PAULO">SÃO PAULO</option>
-          <option value="GIG|RÍO DE JANEIRO">RÍO DE JANEIRO</option><option value="LIM|LIMA">LIMA</option>
-          <option value="BOG|BOGOTÁ">BOGOTÁ</option><option value="MIA|MIAMI">MIAMI</option>
         </select>
       </div>
       <div class="form-group full"><label class="form-label">Nombre del cupo <span style="color:var(--muted)">(se sugiere solo; podés editarlo)</span></label><input class="form-input" id="v-nombre" placeholder="Ej: Río de Janeiro - Gol - 05/06/2026" oninput="nombreCupoManual=true"/></div>
@@ -512,12 +507,24 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-08 (b8 · fixes baratos)';
+const APP_VERSION='Fase 2 · 2026-06-09 (b9 · fixes Mikaela)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (tomada del sitio guamatur.com)
 const GUA_PRIMARY='#d11242', GUA_SECONDARY='#8946a0', GUA_LOGO='https://www.guamatur.com/assets/guamatur-logo-footer.svg';
 const AEROLINEA_COLOR={LATAM:'#1b0088',GOL:'#ff7a00',Avianca:'#d8202f',SKY:'#00247d','JetSmart':'#e40046',Azul:'#00a1de','Aerolíneas Argentinas':'#74acdf','Iberia':'#d7192d','Air Europa':'#0a3d91','American':'#0078d2','Copa':'#0c2340'};
+const AEROLINEAS=Object.keys(AEROLINEA_COLOR);
+// Ciudades con su región (para filtrar el selector Ciudad al elegir Región)
+const CIUDADES=[
+  {cod:'GRU',nom:'SÃO PAULO',reg:'Brasil'},{cod:'GIG',nom:'RÍO DE JANEIRO',reg:'Brasil'},
+  {cod:'REC',nom:'RECIFE',reg:'Brasil'},{cod:'SSA',nom:'SALVADOR',reg:'Brasil'},
+  {cod:'PUJ',nom:'PUNTA CANA',reg:'Caribe'},{cod:'AUA',nom:'ARUBA',reg:'Caribe'},{cod:'CUN',nom:'CANCÚN',reg:'Caribe'},
+  {cod:'SCL',nom:'SANTIAGO DE CHILE',reg:'Chile'},{cod:'PMC',nom:'PUERTO MONTT',reg:'Chile'},
+  {cod:'LIM',nom:'LIMA',reg:'Otros'},{cod:'BOG',nom:'BOGOTÁ',reg:'Otros'},{cod:'MIA',nom:'MIAMI',reg:'Otros'}
+];
+// Condiciones generales del PDF del itinerario (texto definido con Operaciones)
+const CONDICIONES_ITINERARIO=['Se requiere documentación escaneada de todos los pasajeros.','Guamatur no es responsable de cualquier cambio de las aerolíneas respecto a horarios, escalas, cancelaciones, cambios.','Guamatur no responde por deterioro, pérdida, extravío, hurto o robo del equipaje y efectos personales.','Presentarse en el aeropuerto al menos 3 horas antes del horario de partida.'];
+const CONDICIONES_NOTA='Esta reserva queda confirmada hasta su fecha de vencimiento establecida en este documento. Para confirmar la reserva se requiere del pago total. En caso de no recibir el pago se cancela automáticamente.';
 // Escape de HTML para todo dato de usuario interpolado en innerHTML/document.write (anti-XSS)
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 let currentUser=null,currentRol=null,currentVueloId=null,currentPasajeroId=null,currentLugarId=null,currentVueloFecha=null,sesionIniciada=false,rolEfectivo=null;
@@ -698,7 +705,7 @@ async function cargarDashboard(){
     sb.from('temporadas').select('*').order('creado_en',{ascending:false}),
     sb.from('vista_vuelos').select('*'),
     sb.from('pasajeros').select('status,vendedor,vuelo_id,lugares(reducido,es_espera)'),
-    sb.from('cancelaciones').select('penalidad_usd,recupero_usd,vuelo_id')
+    sb.from('cancelaciones').select('penalidad_usd,recupero_usd,vuelo_id,usuario,fecha')
   ]);
   if(!vuelos){cont.innerHTML='<div class="loading" style="color:var(--red)">Error</div>';return;}
 
@@ -769,12 +776,19 @@ async function cargarDashboard(){
 
   // Cancelaciones: solo admin
   if(esAdminDash){
+    const nombreCupo={};filtrados.forEach(v=>{nombreCupo[v.id]=v.nombre;});
+    const cancelsOrden=[...cancelsFiltradas].sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
     html+=`<div class="section-title" style="margin-bottom:12px">Cancelaciones</div>
     <div class="op-grid" style="grid-template-columns:repeat(3,1fr)">
       <div class="op-card"><div class="op-label">Cancelaciones</div><div class="op-value">${totalCancels}</div></div>
       <div class="op-card ${totalPenalidad>0?'danger':''}"><div class="op-label">Penalidad total (USD)</div><div class="op-value ${totalPenalidad>0?'danger':''}">$${totalPenalidad.toLocaleString('es-UY',{minimumFractionDigits:0})}</div></div>
       <div class="op-card"><div class="op-label">Recupero total (USD)</div><div class="op-value c-green">$${totalRecupero.toLocaleString('es-UY',{minimumFractionDigits:0})}</div></div>
     </div>`;
+    if(cancelsOrden.length){
+      html+=`<div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Cupo</th><th>Usuario</th><th>Fecha y hora</th><th>Penalidad</th><th>Recupero</th></tr></thead><tbody>`;
+      cancelsOrden.forEach(c=>{html+=`<tr><td style="color:var(--accent2)">${esc(nombreCupo[c.vuelo_id])||'—'}</td><td>${esc(c.usuario)||'—'}</td><td style="font-family:'DM Mono',monospace;font-size:12px">${formatFechaHora(c.fecha)}</td><td class="${Number(c.penalidad_usd)>0?'c-red':''}">$${Number(c.penalidad_usd||0).toLocaleString('es-UY')}</td><td class="c-green">$${Number(c.recupero_usd||0).toLocaleString('es-UY')}</td></tr>`;});
+      html+='</tbody></table></div>';
+    }
   }
 
   cont.innerHTML=html;
@@ -882,7 +896,9 @@ async function cargarDetalle(vueloId){
   const rV=lugaresActivos.filter(l=>l.pasajeros?.[0]?.status==='R').length;
   const libresArr=lugaresActivos.filter(l=>!l.pasajeros?.[0]||l.pasajeros[0].status==='L');
   const lV=libresArr.length;
-  const esVueloC=lV<=3;
+  // "Últimos lugares" (vencimiento 24h) = últimos lugares VENDIBLES: se excluyen los de Operaciones.
+  // Debe coincidir con vencer_reservas() en el servidor, si no el vencimiento mostrado no matchea la baja automática.
+  const esVueloC=libresArr.filter(l=>!l.bloqueado_operaciones).length<=3;
   const esAdmin=rolEfectivo==='admin';
   const infantMap={};
   (infants||[]).forEach(inf=>{if(inf.pasajero_id)infantMap[inf.pasajero_id]=inf});
@@ -891,7 +907,7 @@ async function cargarDetalle(vueloId){
   const idsLibres=reservables.map(l=>l.id);
   const lVReservable=reservables.length;
   const bloqLibres=libresArr.filter(l=>l.bloqueado_operaciones).length;
-  const numCols=esAdmin?14:13;
+  const numCols=14;
   const vendedorNombreActual=vendedores.find(v=>v.email===currentUser?.email)?.nombre||currentUser?.email||'';
   const misReservas=(!esAdmin)?lugaresActivos.concat(lugaresEspera).filter(l=>{const p=l.pasajeros?.[0];return p&&!p.cancelado&&p.status!=='L'&&p.vendedor===vendedorNombreActual;}):[];
 
@@ -927,9 +943,9 @@ async function cargarDetalle(vueloId){
   </div>`;
 
   if(vuelo.itinerario&&vuelo.itinerario.length>0){
-    html+=`<div class="itinerario-wrap"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="itinerario-title" style="margin:0">✈ Itinerario del cupo</div><button class="btn-sm" onclick="imprimirItinerario('${vueloId}')">🖨 Imprimir / PDF</button></div>
+    html+=`<div class="itinerario-wrap"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:10px"><img src="${GUA_LOGO}" alt="Guamatur Viajes" style="height:22px"/><div class="itinerario-title" style="margin:0">✈ Itinerario del cupo</div></div><button class="btn-sm" onclick="imprimirItinerario('${vueloId}')">🖨 Imprimir / PDF</button></div>
     <table class="itinerario-table"><thead><tr><th>Tipo</th><th>Fecha</th><th>Aerolínea</th><th>Vuelo</th><th>Origen</th><th>Destino</th><th>Salida</th><th>Llegada</th></tr></thead><tbody>`;
-    vuelo.itinerario.forEach(t=>{const tipo=t.tipo||'Ida';const badgeCls=tipo==='Vuelta'?'badge-orange':'badge-green';html+=`<tr><td><span class="badge ${badgeCls}">${esc(tipo)}</span></td><td>${esc(t.fecha)||'—'}</td><td>${esc(t.aerolinea)||'—'}</td><td>${esc(t.vuelo)||'—'}</td><td>${esc(t.origen)||'—'}</td><td>${esc(t.destino)||'—'}</td><td>${esc(t.salida)||'—'}</td><td>${esc(t.llegada)||'—'}</td></tr>`;});
+    vuelo.itinerario.forEach(t=>{const tipo=t.tipo||'Ida';const badgeCls=tipo==='Vuelta'?'badge-orange':'badge-green';html+=`<tr><td><span class="badge ${badgeCls}">${esc(tipo)}</span></td><td>${esc(t.fecha)||'—'}</td><td>${esc(t.aerolinea||vuelo.aerolinea)||'—'}</td><td>${esc(t.vuelo)||'—'}</td><td>${esc(t.origen)||'—'}</td><td>${esc(t.destino)||'—'}</td><td>${esc(t.salida)||'—'}</td><td>${esc(t.llegada)||'—'}</td></tr>`;});
     html+='</tbody></table></div>';
   }
 
@@ -981,7 +997,7 @@ async function cargarDetalle(vueloId){
       <td>${esc(p?.factura)||'—'}</td>
       <td>${formatFechaHora(p?.fecha_reserva)}</td>
       <td class="${vencido&&st==='R'?'vencimiento-warn':'vencimiento-ok'}">${st==='R'?vText:'—'}</td>
-      ${esAdmin?`<td>${esc(p?.ficha)||'—'}</td>`:''}
+      <td>${esc(p?.ficha)||'—'}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p?.comentarios)}">${esc(p?.comentarios)||'—'}</td>
       ${hasAccion?`<td>${accion}</td>`:''}
     </tr>`;
@@ -993,7 +1009,7 @@ async function cargarDetalle(vueloId){
     return h;
   }
 
-  const headPlanilla=`<tr><th>#</th><th>Primer apellido</th><th>Segundo apellido</th><th>Primer nombre</th><th>Segundo nombre</th><th>Hotel</th><th>Vendedor</th><th>Status</th><th>Factura</th><th>Fecha reserva</th><th>Vencimiento</th>${esAdmin?'<th>Ficha</th>':''}<th>Comentarios</th><th></th></tr>`;
+  const headPlanilla=`<tr><th>#</th><th>Primer apellido</th><th>Segundo apellido</th><th>Primer nombre</th><th>Segundo nombre</th><th>Hotel</th><th>Vendedor</th><th>Status</th><th>Factura</th><th>Fecha reserva</th><th>Vencimiento</th><th>Ficha</th><th>Comentarios</th><th></th></tr>`;
   html+=`<div class="table-wrap"><table><thead>${headPlanilla}</thead><tbody>`;
   lugaresActivos.forEach(l=>{html+=fila(l,'activo',true,numCols-1);});
   if(lugaresReducidos.length){
@@ -1003,13 +1019,13 @@ async function cargarDetalle(vueloId){
   html+='</tbody></table></div>';
 
   // ── LISTA DE ESPERA (6 lugares extra, numerada desde 1) ──
-  const esperaCols=esAdmin?14:13;
+  const esperaCols=14;
   if(lugaresEspera.length){
     const ocupEspera=lugaresEspera.filter(l=>l.pasajeros?.[0]&&l.pasajeros[0].status!=='L'&&!l.pasajeros[0].cancelado).length;
     const libresEspera=lugaresEspera.filter(l=>!l.pasajeros?.[0]||l.pasajeros[0].status==='L').length;
     html+=`<details style="margin-bottom:24px"><summary style="cursor:pointer;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;font-size:13px;font-weight:500;color:var(--accent2);list-style:none">📋 Lista de espera — ${ocupEspera}/${lugaresEspera.length} ocupados <span style="color:var(--muted);font-weight:400">(click para desplegar)</span></summary>
     <div style="margin-top:8px">${libresEspera>0?`<button class="btn btn-success" onclick="abrirModalReservarEspera('${vueloId}',${libresEspera})">+ Reservar en espera</button>`:''}</div>
-    <div class="table-wrap" style="margin-top:8px"><table><thead><tr><th>#</th><th>Primer apellido</th><th>Segundo apellido</th><th>Primer nombre</th><th>Segundo nombre</th><th>Hotel</th><th>Vendedor</th><th>Status</th><th>Factura</th><th>Fecha reserva</th><th>Vencimiento</th>${esAdmin?'<th>Ficha</th>':''}<th>Comentarios</th><th></th></tr></thead><tbody>`;
+    <div class="table-wrap" style="margin-top:8px"><table><thead><tr><th>#</th><th>Primer apellido</th><th>Segundo apellido</th><th>Primer nombre</th><th>Segundo nombre</th><th>Hotel</th><th>Vendedor</th><th>Status</th><th>Factura</th><th>Fecha reserva</th><th>Vencimiento</th><th>Ficha</th><th>Comentarios</th><th></th></tr></thead><tbody>`;
     lugaresEspera.forEach(l=>{html+=fila(l,'espera',true,esperaCols-1);});
     html+='</tbody></table></div></details>';
   } else if(esAdmin){
@@ -1024,6 +1040,8 @@ function abrirModalPasajero(lugarId,pasajero,vueloId,infant=null){
   currentLugarId=lugarId;currentVueloId=vueloId;
   const esLibre=!pasajero||!pasajero.id;
   currentPasajeroId=esLibre?null:(pasajero.id||null);
+  // Botón "Itinerario PDF" (por reserva): solo si ya hay una reserva cargada
+  {const btnImp=document.getElementById('btn-imprimir-reserva');if(btnImp)btnImp.style.display=esLibre?'none':'';}
   document.getElementById('p-apellido1').value=esLibre?'':(pasajero.primer_apellido||'');
   document.getElementById('p-apellido2').value=esLibre?'':(pasajero.segundo_apellido||'');
   document.getElementById('p-nombre1').value=esLibre?'':(pasajero.primer_nombre||'');
@@ -1096,6 +1114,9 @@ async function guardarPasajero(){
   let status=document.getElementById('p-status').value;
   if(rolEfectivo==='vendedor'&&status==='L') status='R';
   const factura=document.getElementById('p-factura').value.trim();
+  const ficha=document.getElementById('p-ficha').value.trim();
+  // Auto-promoción a Vendido: una reserva con factura + ficha cargadas pasa de R a V
+  if(status==='R'&&factura&&ficha) status='V';
   if(status==='V'&&!factura){mostrarAlerta('modal-p-alert','Factura obligatoria para status V','error');return;}
   setBtnLoading('btn-guardar-pasajero',true);
   await asegurarTokenFresco();
@@ -1108,7 +1129,7 @@ async function guardarPasajero(){
       segundo_nombre:document.getElementById('p-nombre2').value,
       hotel:document.getElementById('p-hotel').value,
       vendedor:document.getElementById('p-vendedor').value,
-      ficha:document.getElementById('p-ficha').value,
+      ficha:ficha||null,
       comentarios:document.getElementById('p-comentarios').value.trim()||null,
       status,factura:factura||null,cancelado:false,aviso_vencimiento_enviado:false,actualizado_en:new Date().toISOString()
     };
@@ -1510,12 +1531,23 @@ async function exportarExcel(vueloId,nombreVuelo){
 }
 
 // ── IMPRIMIR / PDF ITINERARIO (con logo) ─────────
-async function imprimirItinerario(vueloId){
+async function imprimirItinerario(vueloId,lugarId){
   const {data:v}=await sb.from('vuelos').select('*').eq('id',vueloId).single();
   if(!v){alert('No se pudo cargar el cupo');return;}
   const it=Array.isArray(v.itinerario)?v.itinerario:[];
+  // Si se imprime desde una reserva puntual: traer fecha de reserva + vencimiento de ese pasajero
+  let reserva=null;
+  if(lugarId){
+    const {data:lugs}=await sb.from('lugares').select('id,reducido,es_espera,bloqueado_operaciones,pasajeros(*)').eq('vuelo_id',vueloId).eq('es_infant',false);
+    const activos=(lugs||[]).filter(l=>!l.es_espera&&!l.reducido&&!l.bloqueado_operaciones);
+    const libres=activos.filter(l=>{const p=l.pasajeros?.[0];return !p||p.status==='L';}).length;
+    const esC=libres<=3; // últimos lugares vendibles → vencimiento 24h; si no, 72h (excluye Operaciones)
+    const p=(lugs||[]).find(l=>l.id===lugarId)?.pasajeros?.[0];
+    if(p&&p.status&&p.status!=='L'){const {texto:vTxt}=vencimientoReserva(p.fecha_reserva,esC);reserva={nombre:[p.primer_apellido,p.segundo_apellido,p.primer_nombre,p.segundo_nombre].filter(Boolean).join(' '),fecha:formatFechaHora(p.fecha_reserva),venc:p.status==='R'?vTxt:'Confirmada (Vendido)'};}
+  }
+  const condItems=CONDICIONES_ITINERARIO.map((c,idx)=>`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px dashed #eee"><span style="background:${GUA_PRIMARY};color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:2px 7px;height:fit-content">${String(idx+1).padStart(2,'0')}</span><span style="font-size:12px;color:#333">${esc(c)}</span></div>`).join('');
   const pillAir=(name)=>{const c=AEROLINEA_COLOR[name];const n=esc(name||'');return n?`<span style="display:inline-block;background:${c||'#555'};color:#fff;padding:2px 9px;border-radius:11px;font-size:11px;font-weight:600">${n}</span>`:'—';};
-  const filas=it.map(t=>{const tipo=esc(t.tipo||'Ida');const tipoCol=tipo==='Vuelta'?GUA_SECONDARY:GUA_PRIMARY;return `<tr><td><span style="color:${tipoCol};font-weight:600">${tipo}</span></td><td>${esc(t.fecha)||'—'}</td><td>${pillAir(t.aerolinea)}</td><td>${esc(t.vuelo)||'—'}</td><td>${esc(t.origen)||'—'}</td><td>${esc(t.destino)||'—'}</td><td>${esc(t.salida)||'—'}</td><td>${esc(t.llegada)||'—'}</td></tr>`;}).join('');
+  const filas=it.map(t=>{const tipo=esc(t.tipo||'Ida');const tipoCol=tipo==='Vuelta'?GUA_SECONDARY:GUA_PRIMARY;return `<tr><td><span style="color:${tipoCol};font-weight:600">${tipo}</span></td><td>${esc(t.fecha)||'—'}</td><td>${pillAir(t.aerolinea||v.aerolinea)}</td><td>${esc(t.vuelo)||'—'}</td><td>${esc(t.origen)||'—'}</td><td>${esc(t.destino)||'—'}</td><td>${esc(t.salida)||'—'}</td><td>${esc(t.llegada)||'—'}</td></tr>`;}).join('');
   const w=window.open('','_blank');
   if(!w){alert('Permití las ventanas emergentes para imprimir');return;}
   w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Itinerario ${esc(v.nombre)}</title>
@@ -1531,11 +1563,19 @@ async function imprimirItinerario(vueloId){
   td{padding:8px 9px;border-bottom:1px solid #eee}
   tr:nth-child(even) td{background:#faf7f8}
   .ft{margin-top:26px;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:12px}
+  .reserva-box{border:1px solid ${GUA_PRIMARY};border-radius:8px;padding:11px 16px;margin-bottom:18px;font-size:13px;color:#333;line-height:1.6}
+  .reserva-box b{color:${GUA_PRIMARY}}
+  .cond{margin-top:26px;border:1px solid #eee;border-radius:10px;padding:16px 18px}
+  .cond h3{font-size:13px;color:#1a1a1a;margin:0 0 8px;display:flex;justify-content:space-between;align-items:baseline}
+  .cond h3 span{font-size:10px;color:#999;font-weight:500}
+  .cond-nota{margin-top:12px;border:1px solid ${GUA_PRIMARY};border-radius:8px;padding:10px 13px;font-size:11.5px;color:#555;line-height:1.5}
   @media print{.noprint{display:none}}</style></head><body>
   <div class="head"><img src="${GUA_LOGO}" alt="Guamatur Viajes"/><div style="text-align:right"><h1>${esc(v.nombre)}</h1><div class="meta">${esc(v.ciudad_nombre)}${v.fecha?' · '+formatFecha(v.fecha):''}${v.aerolinea?' · '+esc(v.aerolinea):''}${v.localizador?'<br>Localizador: '+esc(v.localizador):''}</div></div></div>
+  ${reserva?`<div class="reserva-box"><b>Pasajero:</b> ${esc(reserva.nombre)||'—'}<br><b>Fecha de reserva:</b> ${reserva.fecha} &nbsp;·&nbsp; <b>Vencimiento de reserva:</b> ${esc(reserva.venc)}</div>`:''}
   <h2>Itinerario de vuelo</h2>
   ${it.length?`<table><thead><tr><th>Tipo</th><th>Fecha</th><th>Aerolínea</th><th>Vuelo</th><th>Origen</th><th>Destino</th><th>Salida</th><th>Llegada</th></tr></thead><tbody>${filas}</tbody></table>`:'<p>Sin itinerario cargado.</p>'}
   ${v.condiciones_equipaje?`<p style="margin-top:16px;font-size:13px"><b style="color:${GUA_PRIMARY}">Equipaje:</b> ${esc(v.condiciones_equipaje)}</p>`:''}
+  <div class="cond"><h3>Condiciones generales de contratación <span>Aéreos · Rev. 2026 · Guamatur Viajes</span></h3>${condItems}<div class="cond-nota">${esc(CONDICIONES_NOTA)}</div></div>
   <div class="ft">Documento generado por el sistema de Cupos de Guamatur · guamatur.com · Sujeto a confirmación.</div>
   <div class="noprint" style="margin-top:22px;text-align:center"><button onclick="window.print()" style="background:${GUA_PRIMARY};color:#fff;border:none;padding:11px 22px;border-radius:6px;font-size:14px;font-family:'Montserrat',sans-serif;font-weight:600;cursor:pointer">Imprimir / Guardar PDF</button></div>
   </body></html>`);
@@ -1676,6 +1716,20 @@ function sugerirNombreCupo(){
   const partes=[ciudad,aerolinea,ffmt].filter(Boolean);
   if(partes.length) document.getElementById('v-nombre').value=partes.join(' - ');
 }
+// Llena el selector Ciudad con las ciudades de la región elegida (o todas si no hay región)
+function renderCiudadesOpciones(region,ciudadActual){
+  const sel=document.getElementById('v-ciudad');if(!sel)return;
+  const lista=CIUDADES.filter(c=>!region||c.reg===region);
+  let html='<option value="">Seleccionar...</option>'+lista.map(c=>`<option value="${esc(c.cod)}|${esc(c.nom)}">${esc(c.nom)}</option>`).join('');
+  // Si la ciudad actual no está en la lista (ej. cupo viejo con otra región), la agrego para no perderla
+  if(ciudadActual&&!lista.some(c=>`${c.cod}|${c.nom}`===ciudadActual)){const nom=ciudadActual.split('|')[1]||ciudadActual;html+=`<option value="${esc(ciudadActual)}">${esc(nom)}</option>`;}
+  sel.innerHTML=html;
+  sel.value=ciudadActual||'';
+}
+function onRegionChange(){
+  renderCiudadesOpciones(document.getElementById('v-destino').value,'');
+  sugerirNombreCupo();
+}
 
 // ── EDITAR VUELO ─────────────────────────────────
 async function abrirEditarVuelo(vueloId){
@@ -1689,7 +1743,7 @@ async function abrirEditarVuelo(vueloId){
       document.getElementById('btn-crear-vuelo').textContent='Guardar cambios';
       document.getElementById('v-temporada').value=v.temporada_id||'';
       document.getElementById('v-destino').value=v.destino||'';
-      document.getElementById('v-ciudad').value=`${v.ciudad_codigo}|${v.ciudad_nombre}`;
+      renderCiudadesOpciones(v.destino||'',`${v.ciudad_codigo}|${v.ciudad_nombre}`);
       document.getElementById('v-nombre').value=v.nombre||'';
       document.getElementById('v-aerolinea').value=v.aerolinea||'';
       document.getElementById('v-localizador').value=v.localizador||'';
@@ -1702,7 +1756,7 @@ async function abrirEditarVuelo(vueloId){
       document.getElementById('v-equipaje').value=v.condiciones_equipaje||'';
       document.getElementById('tramos-wrap').innerHTML='';
       tramosCount=0;
-      if(v.itinerario){v.itinerario.forEach(t=>{agregarTramo();const i=tramosCount-1;const selTipo=document.getElementById(`t-t-${i}`);if(selTipo)selTipo.value=t.tipo||'Ida';document.getElementById(`t-f-${i}`).value=t.fecha||'';document.getElementById(`t-a-${i}`).value=t.aerolinea||'';document.getElementById(`t-v-${i}`).value=t.vuelo||'';document.getElementById(`t-o-${i}`).value=t.origen||'';document.getElementById(`t-d-${i}`).value=t.destino||'';document.getElementById(`t-s-${i}`).value=t.salida||'';document.getElementById(`t-l-${i}`).value=t.llegada||'';});}
+      if(v.itinerario){v.itinerario.forEach(t=>{agregarTramo();const i=tramosCount-1;const selTipo=document.getElementById(`t-t-${i}`);if(selTipo)selTipo.value=t.tipo||'Ida';document.getElementById(`t-f-${i}`).value=t.fecha||'';setTramoAerolinea(i,t.aerolinea);document.getElementById(`t-v-${i}`).value=t.vuelo||'';document.getElementById(`t-o-${i}`).value=t.origen||'';document.getElementById(`t-d-${i}`).value=t.destino||'';document.getElementById(`t-s-${i}`).value=t.salida||'';document.getElementById(`t-l-${i}`).value=t.llegada||'';});}
     }
   }
   document.getElementById('modal-v-alert').innerHTML='';
@@ -1719,6 +1773,7 @@ async function abrirModalVuelo(){
   document.getElementById('modal-vuelo-title').textContent='Nuevo cupo';
   document.getElementById('btn-crear-vuelo').textContent='Crear cupo';
   ['v-destino','v-ciudad','v-aerolinea'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+  renderCiudadesOpciones('','');
   ['v-nombre','v-localizador','v-fecha','v-lugares','v-precio','v-precio-neto','v-equipaje'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
   document.getElementById('v-visible').value='true';
   nombreCupoManual=false;
@@ -1743,6 +1798,8 @@ async function guardarVuelo(){
     setBtnLoading('btn-crear-vuelo',true,editarVueloId?'Guardar cambios':'Crear cupo');
     const [ciudad_codigo,ciudad_nombre]=ciudadVal.split('|');
     const itinerario=obtenerItinerario();
+    // Itinerario obligatorio al CREAR un cupo (en edición no se fuerza, para no trabar cupos viejos)
+    if(!editarVueloId&&itinerario.length===0){mostrarAlerta('modal-v-alert','Cargá al menos un tramo de itinerario para crear el cupo','error');setBtnLoading('btn-crear-vuelo',false,'Crear cupo');return;}
     const datos={
       temporada_id:document.getElementById('v-temporada').value,
       nombre,destino:document.getElementById('v-destino').value||null,
@@ -1856,12 +1913,16 @@ function parsearItinerarioPegado(){
     agregarTramo();const i=tramosCount-1;
     const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
     const selT=document.getElementById(`t-t-${i}`);if(selT)selT.value=t.tipo;
-    set(`t-f-${i}`,t.fecha);set(`t-a-${i}`,t.aerolinea);set(`t-v-${i}`,t.vuelo);
+    set(`t-f-${i}`,t.fecha);setTramoAerolinea(i,t.aerolinea);set(`t-v-${i}`,t.vuelo);
     set(`t-o-${i}`,t.origen);set(`t-d-${i}`,t.destino);set(`t-s-${i}`,t.salida);set(`t-l-${i}`,t.llegada);
   });
   msg.style.color='var(--green)';msg.textContent=`${tramos.length} tramo(s) detectado(s). Revisá y ajustá lo que falte.`;
 }
 
+// Opciones de aerolínea para los dropdowns de tramo (Mejora 3: evita tipeo manual)
+function opcionesAerolinea(sel){return '<option value="">—</option>'+AEROLINEAS.map(a=>`<option value="${esc(a)}"${sel===a?' selected':''}>${esc(a)}</option>`).join('');}
+// Setea la aerolínea de un tramo; si el valor no existe como opción (ej. parseo de un código raro), lo agrega para no perderlo
+function setTramoAerolinea(i,val){const el=document.getElementById(`t-a-${i}`);if(!el)return;if(val&&!Array.from(el.options).some(o=>o.value===val))el.insertAdjacentHTML('beforeend',`<option value="${esc(val)}">${esc(val)}</option>`);el.value=val||'';}
 function agregarTramo(){
   const wrap=document.getElementById('tramos-wrap');
   const i=tramosCount++;
@@ -1870,7 +1931,7 @@ function agregarTramo(){
   div.style.cssText='display:grid;grid-template-columns:50px 68px 78px 64px 50px 50px 54px 54px 20px;gap:6px;margin-bottom:6px;align-items:center';
   div.innerHTML=`<select class="form-select" id="t-t-${i}" style="padding:5px 8px;font-size:12px"><option value="Ida">Ida</option><option value="Vuelta">Vuelta</option></select>
     <input class="form-input" placeholder="28 mar" id="t-f-${i}" style="padding:5px 8px;font-size:12px"/>
-    <input class="form-input" placeholder="GOL" id="t-a-${i}" style="padding:5px 8px;font-size:12px"/>
+    <select class="form-select" id="t-a-${i}" style="padding:5px 8px;font-size:12px">${opcionesAerolinea('')}</select>
     <input class="form-input" placeholder="LA 2421" id="t-v-${i}" style="padding:5px 8px;font-size:12px"/>
     <input class="form-input" placeholder="MVD" id="t-o-${i}" style="padding:5px 8px;font-size:12px"/>
     <input class="form-input" placeholder="LIM" id="t-d-${i}" style="padding:5px 8px;font-size:12px"/>
