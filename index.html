@@ -532,7 +532,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-10 (b17 · seguridad pasajeros RPC)';
+const APP_VERSION='Fase 2 · 2026-06-10 (b18 · seguridad lugares/vuelos/log)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (manual oficial — ver 00 - Sistema/referencias/marca-guamatur/)
@@ -1391,8 +1391,8 @@ async function cancelarCupo(vueloId){
 // ── LOG DE ACTIVIDAD ─────────────────────────────
 async function registrarLog(accion,entidad,entidadId,detalle){
   try{
-    const usuario=vendedores.find(v=>v.email===currentUser?.email)?.nombre||currentUser?.email||'?';
-    await sb.from('log_actividad').insert({usuario,accion,entidad,entidad_id:entidadId?String(entidadId):null,detalle:detalle||null});
+    // Log sellado por el servidor (usuario = JWT) y append-only: la tabla quedo solo-lectura para clientes.
+    await sb.rpc('registrar_log',{p_accion:accion,p_entidad:entidad,p_entidad_id:entidadId?String(entidadId):null,p_detalle:detalle||null});
   }catch(e){console.warn('[log] no se pudo registrar:',e);}
 }
 
