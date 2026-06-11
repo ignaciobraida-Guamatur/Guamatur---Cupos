@@ -154,6 +154,7 @@
   <div class="nav-links" id="nav-links" style="display:none">
     <button class="nav-link active" onclick="goTo('dashboard')">Dashboard</button>
     <button class="nav-link" onclick="goTo('vuelos')">Cupos</button>
+    <button class="nav-link" onclick="goTo('misreservas')">Mis reservas</button>
     <button class="nav-link" id="nav-admin" style="display:none" onclick="goTo('admin')">Administración</button>
   </div>
   <div class="nav-right">
@@ -174,6 +175,7 @@
   <div class="mobile-menu-inner" onclick="event.stopPropagation()">
     <button class="mobile-menu-btn" onclick="goTo('dashboard');toggleMobileMenu()">📊 Dashboard</button>
     <button class="mobile-menu-btn" onclick="goTo('vuelos');toggleMobileMenu()">✈ Cupos</button>
+    <button class="mobile-menu-btn" onclick="goTo('misreservas');toggleMobileMenu()">🎫 Mis reservas</button>
     <button class="mobile-menu-btn" id="mobile-admin" style="display:none" onclick="goTo('admin');toggleMobileMenu()">⚙️ Administración</button>
     <button class="mobile-menu-btn" onclick="cerrarSesion()" style="color:var(--red)">Cerrar sesión</button>
   </div>
@@ -200,6 +202,11 @@
 
 <div id="screen-dashboard" class="screen">
   <div id="dashboard-content"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+</div>
+
+<div id="screen-misreservas" class="screen">
+  <div style="font-size:18px;font-weight:600;margin-bottom:16px">Mis reservas</div>
+  <div id="misreservas-content"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
 </div>
 
 <div id="screen-vuelos" class="screen">
@@ -532,7 +539,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-10 (b18 · seguridad lugares/vuelos/log)';
+const APP_VERSION='Fase 2 · 2026-06-11 (b19 · Mis reservas)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (manual oficial — ver 00 - Sistema/referencias/marca-guamatur/)
@@ -658,6 +665,7 @@ function cambiarVista(rol){
   if(id==='screen-admin'&&rolEfectivo!=='admin'){goTo('vuelos');return;}
   if(id==='screen-dashboard') cargarDashboard();
   else if(id==='screen-vuelos') cargarVuelos();
+  else if(id==='screen-misreservas') cargarMisReservas();
   else if(id==='screen-admin') cargarAdmin();
   else if(id==='screen-detalle'&&currentVueloId) cargarDetalle(currentVueloId);
   else goTo('dashboard');
@@ -669,11 +677,12 @@ function goTo(s){
   document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(x=>x.classList.remove('active'));
   document.getElementById('screen-'+s).classList.add('active');
-  const idx={dashboard:0,vuelos:1,admin:2};
+  const idx={dashboard:0,vuelos:1,misreservas:2,admin:3};
   const links=document.querySelectorAll('.nav-link');
   if(idx[s]!==undefined&&links[idx[s]]) links[idx[s]].classList.add('active');
   if(s==='dashboard') cargarDashboard();
   if(s==='vuelos'){vuelosCargado=false;cargarVuelos();}
+  if(s==='misreservas') cargarMisReservas();
   if(s==='admin'){adminCargado=false;cargarAdmin();}
 }
 
@@ -834,6 +843,47 @@ async function cargarDashboard(){
   cont.innerHTML=html;
 }
 function setDashFiltro(f){dashFiltro=f;cargarDashboard()}
+
+// ── MIS RESERVAS (vista del vendedor: todas sus reservas y ventas) ──
+async function cargarMisReservas(){
+  const cont=document.getElementById('misreservas-content');
+  cont.innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
+  const nombre=vendedores.find(v=>v.email===currentUser?.email)?.nombre||currentUser?.email||'';
+  const {data,error}=await sb.from('pasajeros')
+    .select('id,status,fecha_reserva,primer_apellido,primer_nombre,vuelo_id,lugares(numero_lugar,es_espera,reducido),vuelos(nombre,destino,fecha)')
+    .eq('vendedor',nombre).neq('status','L').eq('cancelado',false);
+  if(error){console.error('[MisReservas]',error);cont.innerHTML='<div class="loading" style="color:var(--red)">Error al cargar</div>';return;}
+  const norm=p=>{const l=Array.isArray(p.lugares)?p.lugares[0]:p.lugares;const v=Array.isArray(p.vuelos)?p.vuelos[0]:p.vuelos;return {...p,lug:l||{},vue:v||{}};};
+  const filas=(data||[]).map(norm).filter(f=>!f.lug.reducido);
+  const reservas=filas.filter(f=>f.status==='R');
+  const vendidos=filas.filter(f=>f.status==='V'&&!f.lug.es_espera);
+  let html=`<div class="kpi-grid" style="margin-bottom:20px">
+    <div class="kpi-card"><div class="kpi-label">Mis reservas</div><div class="kpi-value c-orange">${reservas.length}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Mis lugares vendidos</div><div class="kpi-value c-red">${vendidos.length}</div></div>
+  </div>`;
+  const orden={R:0,V:1};
+  const lista=[...filas].sort((a,b)=>(orden[a.status]-orden[b.status])||String(a.vue.fecha||'').localeCompare(String(b.vue.fecha||'')));
+  if(!lista.length){
+    html+='<div style="padding:16px;color:var(--muted);font-size:14px">Todavía no tenés reservas ni ventas registradas.</div>';
+  } else {
+    html+=`<div class="table-wrap"><table><thead><tr><th>Cupo</th><th>Destino</th><th>Fecha de viaje</th><th>Pasajero</th><th>Status</th><th>Fecha de reserva</th></tr></thead><tbody>`;
+    lista.forEach(f=>{
+      const nom=f.primer_apellido?esc(`${f.primer_apellido} ${f.primer_nombre||''}`.trim()):'(sin nombre)';
+      const stBadge=f.status==='V'?'<span class="badge badge-v">V</span>':'<span class="badge badge-r">R</span>';
+      const esp=f.lug.es_espera?' <span class="badge badge-l">espera</span>':'';
+      html+=`<tr style="cursor:pointer" onclick="goToDetalle('${f.vuelo_id}')">
+        <td style="color:var(--accent2);font-weight:500">${esc(f.vue.nombre)||'—'}</td>
+        <td>${f.vue.destino?`<span class="badge ${regionBadge(f.vue.destino)}">${esc(f.vue.destino)}</span>`:'—'}</td>
+        <td>${formatFecha(f.vue.fecha)}</td>
+        <td>${nom}${esp}</td>
+        <td>${stBadge}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${formatFechaHora(f.fecha_reserva)}</td>
+      </tr>`;
+    });
+    html+='</tbody></table></div>';
+  }
+  cont.innerHTML=html;
+}
 
 // ── VUELOS ───────────────────────────────────────
 async function cargarVuelos(){
