@@ -540,7 +540,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-13 (b25 · espera sin venc + aviso infant)';
+const APP_VERSION='Fase 2 · 2026-06-13 (b26 · reducción atómica)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,total_lugares,precio,condiciones_equipaje,creado_en,destino,localizador,itinerario,visible,itinerario_historial';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
@@ -1469,15 +1469,15 @@ async function confirmarReduccion(){
   if(n>reducirMaxLibres){mostrarAlerta('modal-red-alert',`Solo hay ${reducirMaxLibres} lugares libres para reducir`,'error');return;}
   setBtnLoading('btn-confirmar-reducir',true,'Confirmar reducción');
   await asegurarTokenFresco();
-  const {data:lugs}=await sb.from('lugares').select('id,numero_lugar,pasajeros(status)').eq('vuelo_id',reducirVueloId).eq('es_infant',false).eq('es_espera',false).eq('reducido',false).order('numero_lugar',{ascending:false});
-  const libres=(lugs||[]).filter(l=>{const p=l.pasajeros?.[0];return !p||p.status==='L';});
-  const aReducir=libres.slice(0,n).map(l=>l.id);
-  const {error}=await sb.from('lugares').update({reducido:true,bloqueado_operaciones:false}).in('id',aReducir);
+  // Reducción ATÓMICA en la base (FOR UPDATE SKIP LOCKED): evita marcar como reducido un lugar que un vendedor reservó en el ínterin (el SELECT→UPDATE client-side reintroducía el race que CLAUDE.md prohíbe)
+  const res=await conReintentoAuth(()=>sb.rpc('reducir_lugares',{p_vuelo_id:reducirVueloId,p_cantidad:n}),'RPC reducir_lugares');
   setBtnLoading('btn-confirmar-reducir',false,'Confirmar reducción');
-  if(error){mostrarAlerta('modal-red-alert','Error al reducir: '+error.message,'error');return;}
-  await registrarLog('reduccion_lugares','vuelo',reducirVueloId,{cantidad:n});
+  if(res?.error){mostrarAlerta('modal-red-alert','Error al reducir: '+res.error.message,'error');return;}
+  const hechos=res?.data||0;
+  if(hechos===0){mostrarAlerta('modal-red-alert','No se pudo reducir: esos lugares ya no estaban libres. Refrescá y reintentá.','error');setTimeout(()=>{cerrarModal('modal-reducir');cargarDetalle(reducirVueloId)},1500);return;}
+  await registrarLog('reduccion_lugares','vuelo',reducirVueloId,{cantidad:hechos});
   await recalcularBloqueoOperaciones(reducirVueloId);
-  mostrarAlerta('modal-red-alert',`${n} lugar${n>1?'es':''} reducido${n>1?'s':''}`,'success');
+  mostrarAlerta('modal-red-alert',`${hechos} lugar${hechos>1?'es':''} reducido${hechos>1?'s':''}`+(hechos<n?` (de ${n} pedidos; el resto ya no estaba libre)`:''),'success');
   setTimeout(()=>{cerrarModal('modal-reducir');cargarDetalle(reducirVueloId)},1000);
 }
 async function cancelarCupo(vueloId){
