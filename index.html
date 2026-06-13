@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Guamatur — Sistema de Cupos</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -540,7 +540,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-13 (b26 · reducción atómica)';
+const APP_VERSION='Fase 2 · 2026-06-13 (b27 · fixes varios + pin supabase-js)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,total_lugares,precio,condiciones_equipaje,creado_en,destino,localizador,itinerario,visible,itinerario_historial';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
@@ -571,7 +571,7 @@ let cancelarLugarId=null,cancelarPasajeroId=null,cancelarVueloId=null;
 let editarVueloId=null,vendedores=[],guardandoVuelo=false,nombreCupoManual=false;
 
 async function loginGoogle(){await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:'https://ignaciobraida-guamatur.github.io/Guamatur---Cupos/'}})}
-async function cerrarSesion(){await sb.auth.signOut();window.location.reload()}
+async function cerrarSesion(){try{await sb.auth.signOut({scope:'local'});}catch(e){console.warn('signOut:',e);}window.location.reload()}
 
 // ── AUTH HELPERS: refresh token y retry para proteger contra desfasajes de reloj ──
 async function asegurarTokenFresco(){
@@ -735,7 +735,6 @@ function vencimientoReserva(s,esC){
   const u=new Date(venc.getTime()+(venc.getTimezoneOffset()+(-3*60))*60000);
   return{texto:u.toLocaleDateString('es-UY',{day:'2-digit',month:'2-digit'})+' '+String(u.getHours()).padStart(2,'0')+':'+String(u.getMinutes()).padStart(2,'0'),vencido:ahoraUY()>venc};
 }
-function horasDesde(s){if(!s)return null;return Math.round((ahoraUY()-new Date(s))/(1000*60*60))}
 function mostrarAlerta(id,msg,tipo){
   const el=document.getElementById(id);if(!el)return;
   el.innerHTML=`<div class="alert alert-${tipo}">${esc(msg)}</div>`;
@@ -1632,14 +1631,14 @@ async function exportarExcel(vueloId,nombreVuelo){
     const adultos=lugares.filter(l=>!l.es_infant&&!l.es_espera&&!l.reducido).sort((a,b)=>grupoExp(a)-grupoExp(b)||a.numero_lugar-b.numero_lugar);
     const reducidos=lugares.filter(l=>!l.es_infant&&!l.es_espera&&l.reducido).sort((a,b)=>a.numero_lugar-b.numero_lugar);
     const espera=lugares.filter(l=>l.es_espera).sort((a,b)=>a.numero_lugar-b.numero_lugar);
-    adultos.forEach((l,idx)=>pushFila(idx+1,'Adulto',l.pasajeros?.[0]||{},(l.pasajeros?.[0]?.status||'L')));
+    adultos.forEach((l,idx)=>{const p=l.pasajeros?.[0];const st=p?.cancelado?'CANCEL':(l.bloqueado_operaciones&&(!p||p.status==='L'))?'OPER':(p?.status||'L');pushFila(idx+1,'Adulto',p||{},st);});
     reducidos.forEach(l=>pushFila(l.numero_lugar,'Reducido',l.pasajeros?.[0]||{},'REDUCIDO'));
     espera.forEach(l=>pushFila(`E${l.numero_lugar}`,'Espera',l.pasajeros?.[0]||{},(l.pasajeros?.[0]?.status||'L')));
     const ws=XLSX.utils.aoa_to_sheet(rows);
     const wb=XLSX.utils.book_new();
-    const sheetName=nombreVuelo.replace(/[\\\/\?\*\[\]]/g,'').substring(0,31);
+    const sheetName=(nombreVuelo.replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31))||'Cupo';
     XLSX.utils.book_append_sheet(wb,ws,sheetName);
-    XLSX.writeFile(wb,`${nombreVuelo}.xlsx`);
+    XLSX.writeFile(wb,`${nombreVuelo.replace(/[\\\/\?\*\[\]:]/g,'-')}.xlsx`);
   }catch(e){alert('Error al exportar: '+e.message);}
 }
 
@@ -2232,11 +2231,12 @@ sb.auth.onAuthStateChange(async(event,session)=>{
   // Solo iniciar una vez por sesión: evita re-correr el login (y efectos como vencimiento) en cada refresh de token
   if(session&&!sesionIniciada){sesionIniciada=true;await iniciarSesion(session);}
   else if(event==='SIGNED_OUT'){
-    sesionIniciada=false;
+    sesionIniciada=false;currentUser=null;currentRol=null;rolEfectivo=null;
     document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
     document.getElementById('screen-login').classList.add('active');
     document.getElementById('nav-links').style.display='none';
     document.getElementById('hamburger').style.display='none';
+    ['user-avatar','rol-badge','ver-como'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
   }
 });
 window.onload=async()=>{
