@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#0f0f13;--surface:#17171e;--surface2:#1e1e28;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#f0f0f5;--muted:#7a7a8c;--accent:#7c6ffd;--accent2:#a78bfa;--red:#ff3b3b;--orange:#ff8000;--green:#4ade80;--yellow:#fbbf24;--blue:#60a5fa}
+  :root{--bg:#0f0f13;--surface:#17171e;--surface2:#1e1e28;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#f0f0f5;--muted:#9a9aad;--accent:#7c6ffd;--accent2:#a78bfa;--red:#ff3b3b;--orange:#ff8000;--green:#4ade80;--yellow:#fbbf24;--blue:#60a5fa}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
   .nav{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:100}
@@ -54,7 +54,7 @@
   tbody tr:last-child td{border-bottom:none}
   tbody tr:hover td{background:rgba(255,255,255,0.02)}
   .badge{display:inline-flex;align-items:center;padding:1px 7px;border-radius:6px;font-size:11px;font-weight:500}
-  .badge-v{background:rgba(255,59,59,0.25);color:#ff6b6b;font-family:'DM Mono',monospace}
+  .badge-v{background:rgba(74,222,128,0.2);color:#4ade80;font-family:'DM Mono',monospace}
   .badge-r{background:rgba(255,128,0,0.25);color:#ff9933;font-family:'DM Mono',monospace}
   .badge-l{background:rgba(255,255,255,0.06);color:var(--muted);font-family:'DM Mono',monospace}
   .badge-infant{background:rgba(124,111,253,0.2);color:var(--accent2);font-family:'DM Mono',monospace}
@@ -80,7 +80,7 @@
   .detalle-titulo{font-size:20px;font-weight:600;margin-bottom:4px}
   .detalle-meta{font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:6px}
   .detalle-actions{display:flex;gap:8px;flex-wrap:wrap}
-  .row-v td{background:rgba(255,59,59,0.12)!important}
+  .row-v td{background:rgba(74,222,128,0.10)!important}
   .row-r td{background:rgba(255,128,0,0.12)!important}
   .row-infant td{background:rgba(124,111,253,0.08)!important;color:var(--accent2)}
   .row-cancelado td{background:rgba(251,191,36,0.08)!important;color:var(--yellow)}
@@ -215,9 +215,9 @@
       <div style="font-size:18px;font-weight:600;margin-bottom:10px">Cupos</div>
       <div id="temp-selector-wrap" class="temp-selector"></div>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <input class="search-input" type="text" placeholder="Buscar cupo..." oninput="filtrarVuelos(this.value)"/>
-      <input class="search-input" type="text" placeholder="🔎 Buscar pasajero..." oninput="buscarPasajeros(this.value)"/>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:3px"><label class="form-label" style="font-size:10px;margin:0">Filtrar cupos</label><input class="search-input" type="text" placeholder="Por nombre o ciudad" oninput="filtrarVuelos(this.value)"/></div>
+      <div style="display:flex;flex-direction:column;gap:3px"><label class="form-label" style="font-size:10px;margin:0">Buscar pasajero</label><input class="search-input" type="text" placeholder="🔎 En todos los cupos" oninput="buscarPasajeros(this.value)"/></div>
     </div>
   </div>
   <div id="vuelos-content"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
@@ -313,6 +313,7 @@
     <div class="modal-title">Reservar lugares</div>
     <div id="modal-r-alert"></div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:16px">Los lugares quedarán reservados a tu nombre. Podés completar los datos de cada pasajero después.</div>
+    <div id="r-venc-info" style="display:none;font-size:13px;background:rgba(255,128,0,0.12);border:1px solid rgba(255,128,0,0.25);color:#ffb366;padding:8px 12px;border-radius:8px;margin-bottom:14px"></div>
     <div class="form-group">
       <label class="form-label">Cantidad de lugares <span id="r-libres-label" style="color:var(--green)"></span></label>
       <input class="form-input" id="r-cantidad" type="number" min="1" placeholder="Ej: 4"/>
@@ -539,7 +540,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-13 (b20 · fix editar cupo reducido)';
+const APP_VERSION='Fase 2 · 2026-06-13 (b21 · UX vendedor: aterrizaje, vencimiento, leyenda)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (manual oficial — ver 00 - Sistema/referencias/marca-guamatur/)
@@ -643,7 +644,8 @@ async function iniciarSesion(session){
   if(rolEfectivo==='admin'){const vc=document.getElementById('ver-como');if(vc){vc.style.display='inline-block';vc.value=rolEfectivo;}}
   aplicarRolEfectivoUI();
   // El vencimiento de reservas corre server-side (función vencer_reservas() + pg_cron), no en el cliente.
-  goTo('dashboard');
+  // El vendedor aterriza en Cupos (su pantalla operativa); el admin en el Dashboard de gestión.
+  goTo(rolEfectivo==='admin'?'dashboard':'vuelos');
 }
 
 function toggleMobileMenu(){document.getElementById('mobile-menu').classList.toggle('open')}
@@ -668,7 +670,7 @@ function cambiarVista(rol){
   else if(id==='screen-misreservas') cargarMisReservas();
   else if(id==='screen-admin') cargarAdmin();
   else if(id==='screen-detalle'&&currentVueloId) cargarDetalle(currentVueloId);
-  else goTo('dashboard');
+  else goTo(rolEfectivo==='admin'?'dashboard':'vuelos');
 }
 
 let dashCargado=false,vuelosCargado=false,adminCargado=false;
@@ -857,26 +859,40 @@ async function cargarMisReservas(){
   const filas=(data||[]).map(norm).filter(f=>!f.lug.reducido);
   const reservas=filas.filter(f=>f.status==='R');
   const vendidos=filas.filter(f=>f.status==='V'&&!f.lug.es_espera);
+  // Criticidad por cupo (≤3 vendibles → la reserva vence en 24h, si no 72h) para mostrar el vencimiento real
+  const vueloIdsR=[...new Set(reservas.map(f=>f.vuelo_id))];
+  const critMap={};
+  if(vueloIdsR.length){
+    const {data:vv}=await sb.from('vista_vuelos').select('id,libres,bloqueados').in('id',vueloIdsR);
+    (vv||[]).forEach(v=>{critMap[v.id]=((v.libres||0)-(v.bloqueados||0))<=3;});
+  }
+  const vencDe=f=>{if(f.status!=='R'||f.lug.es_espera||!f.fecha_reserva)return null;const esC=!!critMap[f.vuelo_id];return {ms:new Date(f.fecha_reserva).getTime()+(esC?24:72)*3600000,info:vencimientoReserva(f.fecha_reserva,esC)};};
   let html=`<div class="kpi-grid" style="margin-bottom:20px">
     <div class="kpi-card"><div class="kpi-label">Mis reservas</div><div class="kpi-value c-orange">${reservas.length}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Mis lugares vendidos</div><div class="kpi-value c-red">${vendidos.length}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Mis lugares vendidos</div><div class="kpi-value c-green">${vendidos.length}</div></div>
   </div>`;
   const orden={R:0,V:1};
-  const lista=[...filas].sort((a,b)=>(orden[a.status]-orden[b.status])||String(a.vue.fecha||'').localeCompare(String(b.vue.fecha||'')));
+  const lista=[...filas].sort((a,b)=>{if(orden[a.status]!==orden[b.status])return orden[a.status]-orden[b.status];if(a.status==='R'){const va=vencDe(a),vb=vencDe(b);return (va?va.ms:Infinity)-(vb?vb.ms:Infinity);}return String(a.vue.fecha||'').localeCompare(String(b.vue.fecha||''));});
   if(!lista.length){
     html+='<div style="padding:16px;color:var(--muted);font-size:14px">Todavía no tenés reservas ni ventas registradas.</div>';
   } else {
-    html+=`<div class="table-wrap"><table><thead><tr><th>Cupo</th><th>Destino</th><th>Fecha de viaje</th><th>Pasajero</th><th>Status</th><th>Fecha de reserva</th></tr></thead><tbody>`;
+    html+=`<div class="table-wrap"><table><thead><tr><th>Cupo</th><th>Destino</th><th>Fecha de viaje</th><th>Pasajero</th><th>Status</th><th>Vence</th><th>Fecha de reserva</th></tr></thead><tbody>`;
     lista.forEach(f=>{
       const nom=f.primer_apellido?esc(`${f.primer_apellido} ${f.primer_nombre||''}`.trim()):'(sin nombre)';
       const stBadge=f.status==='V'?'<span class="badge badge-v">V</span>':'<span class="badge badge-r">R</span>';
       const esp=f.lug.es_espera?' <span class="badge badge-l">espera</span>':'';
+      let venceCell='—';
+      if(f.status==='R'){
+        if(f.lug.es_espera) venceCell='<span style="color:var(--muted)">sin venc. (espera)</span>';
+        else{const vd=vencDe(f);if(vd){const urge=vd.info.vencido||(vd.ms-Date.now())<12*3600000;venceCell=`<span class="${urge?'vencimiento-warn':''}">${vd.info.texto}${vd.info.vencido?' (vencida)':''}</span>`;}else venceCell='<span style="color:var(--muted)">sin fecha</span>';}
+      }
       html+=`<tr style="cursor:pointer" onclick="goToDetalle('${f.vuelo_id}')">
         <td style="color:var(--accent2);font-weight:500">${esc(f.vue.nombre)||'—'}</td>
         <td>${f.vue.destino?`<span class="badge ${regionBadge(f.vue.destino)}">${esc(f.vue.destino)}</span>`:'—'}</td>
         <td>${formatFecha(f.vue.fecha)}</td>
         <td>${nom}${esp}</td>
         <td>${stBadge}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${venceCell}</td>
         <td style="font-family:'DM Mono',monospace;font-size:12px">${formatFechaHora(f.fecha_reserva)}</td>
       </tr>`;
     });
@@ -915,7 +931,7 @@ function renderVuelos(lista){
   });
   // Orden por estado: Disponible → Pocos → Últimos → Completo
   filas.sort((a,b)=>a.orden-b.orden||(a.nombre||'').localeCompare(b.nombre||''));
-  let html=`<div class="table-wrap"><table><thead><tr><th>Cupo</th><th>Región</th><th>Ciudad</th><th>Fecha</th><th>Total</th><th>Vendidos</th><th>Reservados</th><th>Libres</th><th>Ocup.</th><th>Alerta</th></tr></thead><tbody>`;
+  let html=`<div class="table-wrap"><table><thead><tr><th>Cupo</th><th>Región</th><th>Ciudad</th><th>Fecha</th><th>Precio</th><th>Total</th><th>Vendidos</th><th>Reservados</th><th>Libres</th><th>Ocup.</th><th>Alerta</th></tr></thead><tbody>`;
   filas.forEach(d=>{
     const oculto=(esAdmin&&d.visible===false)?' <span class="badge badge-l">Oculto</span>':'';
     const redu=(d.reducidos>0)?` <span class="badge badge-l" title="${d.reducidos} lugar(es) reducido(s)">−${d.reducidos}</span>`:'';
@@ -924,6 +940,7 @@ function renderVuelos(lista){
       <td><span class="badge ${regionBadge(d.destino)}">${esc(d.destino)||'—'}</span></td>
       <td>${esc(d.ciudad_nombre)||'—'}</td>
       <td>${d.fecha?formatFecha(d.fecha):'—'}</td>
+      <td style="color:var(--green)">${d.precio?'USD '+Number(d.precio).toLocaleString('es-UY'):'—'}</td>
       <td>${d.tot}</td>
       <td class="c-red">${d.vV}</td>
       <td class="c-orange">${d.rV}</td>
@@ -1018,7 +1035,7 @@ async function cargarDetalle(vueloId){
     </div>
     <div class="detalle-actions">
       <button class="btn btn-outline" onclick="goTo('vuelos')">← Volver</button>
-      <button class="btn btn-success" onclick="abrirModalReservar('${vueloId}',${lVReservable},'${idsLibres.join(',')}',${bloqLibres})">+ Reservar lugares</button>
+      <button class="btn btn-success" onclick="abrirModalReservar('${vueloId}',${lVReservable},'${idsLibres.join(',')}',${bloqLibres},${esVueloC})">+ Reservar lugares</button>
       <button class="btn btn-excel" onclick="exportarExcel('${vueloId}')">⬇ Excel</button>
       ${(!esAdmin&&misReservas.length)?`<button class="btn btn-outline" onclick="abrirModalEliminar('${vueloId}')">🗑 Eliminar mis reservas (${misReservas.length})</button>`:''}
       ${esAdmin?`<button class="btn btn-warning" onclick="abrirModalCancelar('${vueloId}')">⚠ Cancelar reservas</button><button class="btn btn-outline" onclick="abrirModalEliminar('${vueloId}')">🗑 Eliminar reservas</button><button class="btn btn-outline" onclick="abrirModalReducir('${vueloId}')">▾ Reducir lugares</button><button class="btn btn-outline" onclick="cancelarCupo('${vueloId}')">✖ Cancelar cupo</button><button class="btn btn-outline" onclick="abrirEditarVuelo('${vueloId}')">✏ Editar cupo</button>`:''}
@@ -1033,6 +1050,16 @@ async function cargarDetalle(vueloId){
     ${lugaresReducidos.length>0?`<div class="info-item"><div class="info-item-label">Reducidos</div><div class="info-item-value" style="font-size:14px;color:var(--muted)">${lugaresReducidos.length}</div></div>`:''}
     ${vuelo.condiciones_equipaje?`<div class="info-item"><div class="info-item-label">Equipaje</div><div class="info-item-value" style="font-size:14px">${esc(vuelo.condiciones_equipaje)}</div></div>`:''}
   </div>`;
+
+  html+=`<details style="margin-bottom:16px"><summary style="cursor:pointer;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;padding:4px 0">ⓘ ¿Qué significan los colores y estados?</summary>
+    <div style="display:flex;flex-wrap:wrap;gap:8px 16px;padding:8px 0;font-size:12px;color:var(--muted)">
+      <span><span class="badge badge-l">L</span> Libre</span>
+      <span><span class="badge badge-r">R</span> Reservado — vence si no se confirma</span>
+      <span><span class="badge badge-v">V</span> Vendido — venta cerrada</span>
+      <span><span class="badge badge-yellow">CANCEL</span> Cancelado</span>
+      <span><span class="badge badge-l">🔒 OPER</span> Reservado para Operaciones (pedir a un admin)</span>
+      <span><span class="badge badge-infant">INF</span> Infant — no ocupa asiento</span>
+    </div></details>`;
 
   if(vuelo.itinerario&&vuelo.itinerario.length>0){
     html+=`<div class="itinerario-wrap"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:10px"><img src="${GUA_LOGO_BLANCO}" alt="Guamatur Viajes" style="height:22px"/><div class="itinerario-title" style="margin:0">✈ Itinerario del cupo</div></div><button class="btn-sm" onclick="imprimirItinerario('${vueloId}')">🖨 Imprimir / PDF</button></div>
@@ -1281,9 +1308,9 @@ async function guardarPasajero(){
 }
 
 // ── MODAL RESERVAR ───────────────────────────────
-let reservarModoEspera=false,reservarModoEsperaBulk=false,reservarBloqLibres=0;
-function abrirModalReservar(vueloId,libres,idsStr,bloq){
-  reservarModoEspera=false;reservarModoEsperaBulk=false;reservarBloqLibres=parseInt(bloq)||0;
+let reservarModoEspera=false,reservarModoEsperaBulk=false,reservarBloqLibres=0,reservarEsC=false;
+function abrirModalReservar(vueloId,libres,idsStr,bloq,esC){
+  reservarModoEspera=false;reservarModoEsperaBulk=false;reservarBloqLibres=parseInt(bloq)||0;reservarEsC=!!esC;
   reservarVueloId=vueloId;reservarLugaresLibres=parseInt(libres);
   reservarLugaresIds=idsStr?idsStr.split(',').filter(x=>x):[];
   document.getElementById('r-cantidad').value='';
@@ -1291,6 +1318,8 @@ function abrirModalReservar(vueloId,libres,idsStr,bloq){
   document.getElementById('r-apellido').value='';
   document.getElementById('r-nombre').value='';
   document.getElementById('r-libres-label').textContent=`(${libres} disponibles)`;
+  const vi=document.getElementById('r-venc-info');
+  if(vi){vi.style.display='block';vi.textContent=`⏳ Si no se confirma con ficha + factura, esta reserva vence en ${esC?'24 horas':'72 horas'}.`;}
   document.getElementById('modal-r-alert').innerHTML='';
   document.getElementById('btn-confirmar-reserva').disabled=false;
   document.getElementById('btn-confirmar-reserva').textContent='Confirmar reserva';
@@ -1330,11 +1359,12 @@ async function confirmarReserva(){
     return;
   }
   await registrarLog('reserva','vuelo',reservarVueloId,{cantidad:hechos,a_nombre:`${apellido} ${nombre}`.trim(),espera:reservarModoEspera});
-  const msg=(!reservarModoEspera&&hechos<cantidad)
+  let msg=(!reservarModoEspera&&hechos<cantidad)
     ?`Se reservaron ${hechos} de ${cantidad} (el resto ya estaba tomado).`
     :`${hechos} lugar${hechos>1?'es':''} reservado${hechos>1?'s':''} correctamente`;
+  if(!reservarModoEspera){const vinfo=vencimientoReserva(new Date().toISOString(),reservarEsC);msg+=` · Vence el ${vinfo.texto} hs.`;}
   mostrarAlerta('modal-r-alert',msg,'success');
-  setTimeout(()=>{cerrarModal('modal-reservar');cargarDetalle(reservarVueloId)},1200);
+  setTimeout(()=>{cerrarModal('modal-reservar');cargarDetalle(reservarVueloId)},reservarModoEspera?1200:2600);
 }
 
 // ── LUGARES: lista de espera / bloqueo Operaciones / reducción ──
@@ -1360,6 +1390,9 @@ function abrirModalReservarEspera(vueloId,libresEspera){
   document.getElementById('r-apellido').value='';
   document.getElementById('r-nombre').value='';
   document.getElementById('r-libres-label').textContent=`(${reservarLugaresLibres} en lista de espera)`;
+  reservarEsC=false;
+  const vi=document.getElementById('r-venc-info');
+  if(vi){vi.style.display='block';vi.textContent='⏳ La lista de espera no vence automáticamente.';}
   document.getElementById('modal-r-alert').innerHTML='';
   document.getElementById('btn-confirmar-reserva').disabled=false;
   document.getElementById('btn-confirmar-reserva').textContent='Confirmar reserva';
