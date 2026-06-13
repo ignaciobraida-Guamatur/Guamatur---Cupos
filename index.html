@@ -539,7 +539,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-11 (b19 · Mis reservas)';
+const APP_VERSION='Fase 2 · 2026-06-13 (b20 · fix editar cupo reducido)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (manual oficial — ver 00 - Sistema/referencias/marca-guamatur/)
@@ -1812,7 +1812,11 @@ async function abrirEditarVuelo(vueloId){
       document.getElementById('v-aerolinea').value=v.aerolinea||'';
       document.getElementById('v-localizador').value=v.localizador||'';
       document.getElementById('v-fecha').value=v.fecha?v.fecha.substring(0,10):'';
-      document.getElementById('v-lugares').value=v.total_lugares||'';
+      // Precargar "Total lugares" con el conteo REAL de lugares activos (no el total_lugares almacenado,
+      // que queda desfasado tras una reducción/cancelación y reviviría stock devuelto a la aerolínea al guardar).
+      const {data:lugsAct}=await sb.from('lugares').select('reducido').eq('vuelo_id',vueloId).eq('es_infant',false).eq('es_espera',false);
+      const activosCount=(lugsAct||[]).filter(l=>!l.reducido).length;
+      document.getElementById('v-lugares').value=activosCount;
       document.getElementById('v-precio').value=v.precio||'';
       document.getElementById('v-precio-neto').value=v.precio_neto||'';
       document.getElementById('v-visible').value=(v.visible===false)?'false':'true';
@@ -1878,16 +1882,22 @@ async function guardarVuelo(){
       itinerario:itinerario.length>0?itinerario:null
     };
     if(editarVueloId){
-      if(!total_lugares||total_lugares<1){mostrarAlerta('modal-v-alert','Total de lugares es obligatorio','error');setBtnLoading('btn-crear-vuelo',false,'Guardar cambios');return;}
+      if(!Number.isInteger(total_lugares)||total_lugares<0){mostrarAlerta('modal-v-alert','Total de lugares inválido','error');setBtnLoading('btn-crear-vuelo',false,'Guardar cambios');return;}
       const {data:lugaresActuales}=await sb.from('lugares').select('id,numero_lugar,reducido,pasajeros(id),cancelaciones(id)').eq('vuelo_id',editarVueloId).eq('es_infant',false).eq('es_espera',false).order('numero_lugar');
       const activos=(lugaresActuales||[]).filter(l=>!l.reducido);
       const cantidadActual=activos.length;
       const maxActual=(lugaresActuales||[]).length?Math.max(...lugaresActuales.map(l=>l.numero_lugar)):0;
       if(total_lugares>cantidadActual){
         const faltantes=total_lugares-cantidadActual;
+        const reducidosN=(lugaresActuales||[]).filter(l=>l.reducido).length;
+        const aviso=reducidosN>0
+          ?`⚠️ Este cupo tiene ${reducidosN} lugar(es) REDUCIDO(s)/cancelado(s) ya devueltos a la aerolínea.\n\nVas a AGREGAR ${faltantes} lugar(es) NUEVOS (de ${cantidadActual} a ${total_lugares}) — esto REVIVE stock. ¿Confirmás?`
+          :`Vas a AGREGAR ${faltantes} lugar(es) nuevos al cupo (de ${cantidadActual} a ${total_lugares}). ¿Confirmás?`;
+        if(!confirm(aviso)){setBtnLoading('btn-crear-vuelo',false,'Guardar cambios');return;}
         const nuevos=Array.from({length:faltantes},(_,i)=>({vuelo_id:editarVueloId,numero_lugar:maxActual+i+1,es_infant:false}));
         const {error:errLug}=await sb.from('lugares').insert(nuevos);
         if(errLug){setBtnLoading('btn-crear-vuelo',false,'Guardar cambios');mostrarAlerta('modal-v-alert','Error al agregar lugares: '+errLug.message,'error');return;}
+        await registrarLog('agregar_lugares','vuelo',editarVueloId,{agregados:faltantes,de:cantidadActual,a:total_lugares,reducidos_existentes:reducidosN});
       } else if(total_lugares<cantidadActual){
         const aBorrar=[...activos].sort((a,b)=>b.numero_lugar-a.numero_lugar).slice(0,cantidadActual-total_lugares);
         const ocupado=aBorrar.find(l=>(l.pasajeros&&l.pasajeros.length>0)||(l.cancelaciones&&l.cancelaciones.length>0));
