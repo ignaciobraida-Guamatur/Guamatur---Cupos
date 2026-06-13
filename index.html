@@ -540,7 +540,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-13 (b21 · UX vendedor: aterrizaje, vencimiento, leyenda)';
+const APP_VERSION='Fase 2 · 2026-06-13 (b22 · fix XSS planilla)';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (manual oficial — ver 00 - Sistema/referencias/marca-guamatur/)
@@ -1090,7 +1090,7 @@ async function cargarDetalle(vueloId){
     const cancelado=p?.cancelado;
     const libreSeat=!p||st==='L';
     const {texto:vText,vencido}=vencimientoReserva(p?.fecha_reserva,esVueloC);
-    const pJson=JSON.stringify(p||{}).replace(/"/g,'&quot;');
+    const pJson=esc(JSON.stringify(p||{}));
     const inf=p?.id?infantMap[p.id]:null;
     let rowCls,statusCell;
     if(modo==='reducido'){rowCls='row-cancelado';statusCell='<span class="badge badge-l">REDUCIDO</span>';}
@@ -1100,8 +1100,8 @@ async function cargarDetalle(vueloId){
     const esPropia=!esAdmin&&p&&!cancelado&&st!=='L'&&p.vendedor===vendedorNombreActual;
     let accion='';
     if(modo==='reducido'){accion=esAdmin?`<button class="btn-sm" onclick="restaurarLugar('${l.id}','${vuelo.id}')">Restaurar</button>`:'—';}
-    else if(esAdmin){accion=`<button class="btn-sm" onclick="abrirModalPasajero('${l.id}',${pJson},'${vuelo.id}',${inf?JSON.stringify(inf).replace(/"/g,'&quot;'):'null'})">Editar</button>`;}
-    else if(esPropia){accion=`<button class="btn-sm" onclick="abrirModalPasajero('${l.id}',${pJson},'${vuelo.id}',${inf?JSON.stringify(inf).replace(/"/g,'&quot;'):'null'})">Editar</button>`;}
+    else if(esAdmin){accion=`<button class="btn-sm" onclick="abrirModalPasajero('${l.id}',${pJson},'${vuelo.id}',${inf?esc(JSON.stringify(inf)):'null'})">Editar</button>`;}
+    else if(esPropia){accion=`<button class="btn-sm" onclick="abrirModalPasajero('${l.id}',${pJson},'${vuelo.id}',${inf?esc(JSON.stringify(inf)):'null'})">Editar</button>`;}
     else if(modo==='espera'&&libreSeat){accion=`<button class="btn-sm" onclick="reservarSlot('${l.id}','${vuelo.id}')">Reservar</button>`;}
     else if(modo==='espera'){accion='—';}
     // Botón visible "PDF de esta reserva" — solo en lugares con reserva (no en libres ni reducidos)
