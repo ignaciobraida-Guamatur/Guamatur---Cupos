@@ -540,7 +540,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-13 (b24 · login robusto + región Otros)';
+const APP_VERSION='Fase 2 · 2026-06-13 (b25 · espera sin venc + aviso infant)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,total_lugares,precio,condiciones_equipaje,creado_en,destino,localizador,itinerario,visible,itinerario_historial';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
@@ -1135,7 +1135,7 @@ async function cargarDetalle(vueloId){
       <td>${statusCell}</td>
       <td>${esc(p?.factura)||'—'}</td>
       <td>${formatFechaHora(p?.fecha_reserva)}</td>
-      <td class="${vencido&&st==='R'?'vencimiento-warn':'vencimiento-ok'}">${st==='R'?vText:'—'}</td>
+      <td class="${vencido&&st==='R'&&!l.es_espera?'vencimiento-warn':'vencimiento-ok'}">${st==='R'?(l.es_espera?'<span style="color:var(--muted)">sin venc. (espera)</span>':vText):'—'}</td>
       <td>${esc(p?.ficha)||'—'}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p?.comentarios)}">${esc(p?.comentarios)||'—'}</td>
       ${hasAccion?`<td><div style="display:flex;gap:6px;flex-wrap:wrap">${accionCell}</div></td>`:''}
@@ -1272,6 +1272,7 @@ async function guardarPasajero(){
       let meses=(dy-ny)*12+(dm-nm);
       if(dd<nd) meses--;
       if(meses>=24){mostrarAlerta('modal-p-alert',`A la fecha del cupo tendría ${Math.floor(meses/12)} año(s) y ${meses%12} mes(es): ya NO califica como INFANT y ocupa un asiento. Revisá la fecha de nacimiento.`,'error');return;}
+      else if(meses>=22){if(!confirm(`El infant tendría ${meses} meses a la SALIDA y cumple 2 años cerca del viaje: al REGRESO podría ya ocupar asiento. Verificá la fecha de regreso. ¿Guardar igual?`))return;}
     }
     // Validación según status: V exige los 4 campos; R/L alcanza con primer apellido o nombre
     if(status==='V'){
@@ -1654,8 +1655,9 @@ async function imprimirItinerario(vueloId,lugarId){
     const activos=(lugs||[]).filter(l=>!l.es_espera&&!l.reducido&&!l.bloqueado_operaciones);
     const libres=activos.filter(l=>{const p=l.pasajeros?.[0];return !p||p.status==='L';}).length;
     const esC=libres<=3; // últimos lugares vendibles → vencimiento 24h; si no, 72h (excluye Operaciones)
-    const p=(lugs||[]).find(l=>l.id===lugarId)?.pasajeros?.[0];
-    if(p&&p.status&&p.status!=='L'){const {texto:vTxt}=vencimientoReserva(p.fecha_reserva,esC);reserva={nombre:[p.primer_apellido,p.segundo_apellido,p.primer_nombre,p.segundo_nombre].filter(Boolean).join(' '),fecha:formatFechaHora(p.fecha_reserva),venc:p.status==='R'?vTxt:'Confirmada (Vendido)'};}
+    const lug=(lugs||[]).find(l=>l.id===lugarId);
+    const p=lug?.pasajeros?.[0];
+    if(p&&p.status&&p.status!=='L'){const {texto:vTxt}=vencimientoReserva(p.fecha_reserva,esC);const vencTxt=p.status==='R'?(lug?.es_espera?'Lista de espera (sujeta a confirmación)':vTxt):'Confirmada (Vendido)';reserva={nombre:[p.primer_apellido,p.segundo_apellido,p.primer_nombre,p.segundo_nombre].filter(Boolean).join(' '),fecha:formatFechaHora(p.fecha_reserva),venc:vencTxt};}
   }
   const condItems=CONDICIONES_ITINERARIO.map((c,idx)=>`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px dashed #eee"><span style="background:${GUA_PRIMARY};color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:2px 7px;height:fit-content">${String(idx+1).padStart(2,'0')}</span><span style="font-size:12px;color:#333">${esc(c)}</span></div>`).join('');
   // El PDF se abre en ventana nueva (sin base URL): convertir el logo a URL absoluta
