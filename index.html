@@ -555,9 +555,30 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-15 (b31 · agenda de eventos en el cupo: captura)';
+const APP_VERSION='Fase 2 · 2026-06-15 (b32 · agenda: dispara webhook n8n al crear cupo)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,total_lugares,precio,condiciones_equipaje,creado_en,destino,localizador,itinerario,visible,itinerario_historial,cal_dias_pago_final,cal_dias_cancel_sin_gastos,cal_dias_cancel_con_gastos,cal_usuarios';
+// Calendarización: al crear un cupo, dispara (fire-and-forget) la creación de eventos en Google Calendar vía n8n.
+const N8N_WEBHOOK_AGENDA='https://guamatur.app.n8n.cloud/webhook/cupo-agenda';
+async function agendarEventosCupo(v){
+  try{
+    if(!v||!v.fecha) return;
+    const users=Array.isArray(v.cal_usuarios)?v.cal_usuarios:[];
+    if(!users.length) return;
+    const base=String(v.fecha).slice(0,10);
+    const evDefs=[['Pago final',v.cal_dias_pago_final],['Cancelación sin gastos',v.cal_dias_cancel_sin_gastos],['Cancelación con gastos',v.cal_dias_cancel_con_gastos]];
+    const eventos=[];
+    evDefs.forEach(([tipo,dias])=>{
+      if(dias===null||dias===undefined||dias==='') return;
+      const d=new Date(base+'T00:00:00');
+      d.setDate(d.getDate()-parseInt(dias));
+      eventos.push({tipo,fecha:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`});
+    });
+    if(!eventos.length) return;
+    const payload={cupo:v.nombre||'',localizador:v.localizador||'',aerolinea:v.aerolinea||'',fecha_salida:base,url:location.origin+location.pathname,attendees:users,eventos};
+    await fetch(N8N_WEBHOOK_AGENDA,{method:'POST',mode:'no-cors',body:JSON.stringify(payload)});
+  }catch(e){console.warn('[Agenda] no se pudo agendar:',e);}
+}
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (manual oficial — ver 00 - Sistema/referencias/marca-guamatur/)
@@ -2014,6 +2035,7 @@ async function guardarVuelo(){
       await recalcularBloqueoOperaciones(vuelo.id);
       await sb.from('lugares').insert(Array.from({length:6},(_,i)=>({vuelo_id:vuelo.id,numero_lugar:i+1,es_infant:false,es_espera:true})));
       await registrarLog('crear_cupo','vuelo',vuelo.id,{nombre:datos.nombre,total:total_lugares});
+      agendarEventosCupo(datos); // fire-and-forget: agenda eventos en Google Calendar vía n8n
       setBtnLoading('btn-crear-vuelo',false,'Crear cupo');
       mostrarAlerta('modal-v-alert',`Vuelo creado con ${total_lugares} lugares`,'success');
       setTimeout(()=>{cerrarModal('modal-vuelo')},1200);
