@@ -540,7 +540,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-15 (b28 · condiciones PDF actualizadas)';
+const APP_VERSION='Fase 2 · 2026-06-15 (b29 · orden planilla: vendidos arriba de reservados)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,total_lugares,precio,condiciones_equipaje,creado_en,destino,localizador,itinerario,visible,itinerario_historial';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
@@ -1012,8 +1012,8 @@ async function cargarDetalle(vueloId){
   if(!vuelo||!lugares){cont.innerHTML='<div class="loading" style="color:var(--red)">Error</div>';return;}
   currentVueloFecha=vuelo.fecha||null;
   const lugaresAdultos=lugares.filter(l=>!l.es_infant&&!l.es_espera);
-  // Orden visual: ocupados (V/R) arriba, luego libres vendibles, luego los de Operaciones; numeración corrida (sin huecos)
-  const grupoLugar=l=>{const pp=l.pasajeros?.[0];if(pp&&pp.status&&pp.status!=='L')return 0;return l.bloqueado_operaciones?2:1;};
+  // Orden visual: Vendidos arriba, luego Reservados, luego cancelados, luego libres vendibles, luego Operaciones; numeración corrida (sin huecos)
+  const grupoLugar=l=>{const pp=l.pasajeros?.[0];if(!pp||pp.status==='L')return l.bloqueado_operaciones?4:3;if(pp.cancelado)return 2;return pp.status==='V'?0:1;};
   const lugaresActivos=lugaresAdultos.filter(l=>!l.reducido).sort((a,b)=>grupoLugar(a)-grupoLugar(b)||a.numero_lugar-b.numero_lugar);
   const lugaresReducidos=lugaresAdultos.filter(l=>l.reducido).sort((a,b)=>a.numero_lugar-b.numero_lugar);
   const lugaresEspera=lugares.filter(l=>l.es_espera).sort((a,b)=>a.numero_lugar-b.numero_lugar);
@@ -1627,7 +1627,7 @@ async function exportarExcel(vueloId,nombreVuelo){
       }
     };
     // Activos (no infant, no espera, no reducido) primero; luego reducidos; luego lista de espera
-    const grupoExp=l=>{const pp=l.pasajeros?.[0];if(pp&&pp.status&&pp.status!=='L')return 0;return l.bloqueado_operaciones?2:1;};
+    const grupoExp=l=>{const pp=l.pasajeros?.[0];if(!pp||pp.status==='L')return l.bloqueado_operaciones?4:3;if(pp.cancelado)return 2;return pp.status==='V'?0:1;};
     const adultos=lugares.filter(l=>!l.es_infant&&!l.es_espera&&!l.reducido).sort((a,b)=>grupoExp(a)-grupoExp(b)||a.numero_lugar-b.numero_lugar);
     const reducidos=lugares.filter(l=>!l.es_infant&&!l.es_espera&&l.reducido).sort((a,b)=>a.numero_lugar-b.numero_lugar);
     const espera=lugares.filter(l=>l.es_espera).sort((a,b)=>a.numero_lugar-b.numero_lugar);
