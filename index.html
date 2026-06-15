@@ -470,6 +470,22 @@
       </div>
       <div class="form-group full"><label class="form-label">Condiciones de equipaje</label><textarea class="form-textarea" id="v-equipaje" placeholder="Ej: 1 carry on + 1 equipaje en bodega 23kg"></textarea></div>
     </div>
+    <div style="margin-bottom:14px;border-top:1px solid var(--border);padding-top:12px">
+      <label class="form-label">📅 Agenda de eventos (Google Calendar) <span style="color:var(--muted);font-size:10px">días antes de la salida · dejá vacío el que No aplique</span></label>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px">
+        <div><label class="form-label" style="font-size:11px">Pago final</label><input class="form-input" id="v-cal-pago" type="number" min="0" placeholder="No aplica"/></div>
+        <div><label class="form-label" style="font-size:11px">Cancelación sin gastos</label><input class="form-input" id="v-cal-cancel-sin" type="number" min="0" placeholder="No aplica"/></div>
+        <div><label class="form-label" style="font-size:11px">Cancelación con gastos</label><input class="form-input" id="v-cal-cancel-con" type="number" min="0" placeholder="No aplica"/></div>
+      </div>
+      <label class="form-label" style="font-size:11px;margin-top:10px;display:block">Agendar a:</label>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" class="v-cal-user" value="diego.busch@guamatur.com" style="width:14px;height:14px"/> Diego Busch</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" class="v-cal-user" value="rodrigo.maulelo@guamatur.com" style="width:14px;height:14px"/> Rodrigo Maulelo</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" class="v-cal-user" value="mariana@guamatur.com" style="width:14px;height:14px"/> Mariana Martinez</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" class="v-cal-user" value="dory@guamatur.com" style="width:14px;height:14px"/> Dory Fazzi</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" class="v-cal-user" value="productoaereo@guamatur.com" style="width:14px;height:14px"/> Producto Aéreo</label>
+      </div>
+    </div>
     <div style="margin-bottom:14px">
       <details style="margin-bottom:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
         <summary style="cursor:pointer;font-size:12px;color:var(--accent2)">📋 Pegar itinerario (GDS / mail) para autocompletar tramos</summary>
@@ -539,9 +555,9 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-15 (b30 · carga masiva: no asume lugares si el PNR no los trae)';
+const APP_VERSION='Fase 2 · 2026-06-15 (b31 · agenda de eventos en el cupo: captura)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
-const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,total_lugares,precio,condiciones_equipaje,creado_en,destino,localizador,itinerario,visible,itinerario_historial';
+const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,total_lugares,precio,condiciones_equipaje,creado_en,destino,localizador,itinerario,visible,itinerario_historial,cal_dias_pago_final,cal_dias_cancel_sin_gastos,cal_dias_cancel_con_gastos,cal_usuarios';
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent='© Guamatur Viajes '+new Date().getFullYear();}
 // Identidad de marca Guamatur (manual oficial — ver 00 - Sistema/referencias/marca-guamatur/)
@@ -1870,6 +1886,10 @@ async function abrirEditarVuelo(vueloId){
       document.getElementById('v-precio').value=v.precio||'';
       const {data:pnEdit}=await sb.rpc('admin_get_precio_neto',{p_vuelo_id:vueloId});
       document.getElementById('v-precio-neto').value=pnEdit||'';
+      document.getElementById('v-cal-pago').value=v.cal_dias_pago_final??'';
+      document.getElementById('v-cal-cancel-sin').value=v.cal_dias_cancel_sin_gastos??'';
+      document.getElementById('v-cal-cancel-con').value=v.cal_dias_cancel_con_gastos??'';
+      {const us=Array.isArray(v.cal_usuarios)?v.cal_usuarios:[];document.querySelectorAll('.v-cal-user').forEach(c=>{c.checked=us.includes(c.value);});}
       document.getElementById('v-visible').value=(v.visible===false)?'false':'true';
       nombreCupoManual=true;
       document.getElementById('v-equipaje').value=v.condiciones_equipaje||'';
@@ -1894,6 +1914,8 @@ async function abrirModalVuelo(){
   ['v-destino','v-ciudad','v-aerolinea'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
   renderCiudadesOpciones('','');
   ['v-nombre','v-localizador','v-fecha','v-lugares','v-precio','v-precio-neto','v-equipaje'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+  ['v-cal-pago','v-cal-cancel-sin','v-cal-cancel-con'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+  document.querySelectorAll('.v-cal-user').forEach(c=>{c.checked=false;});
   document.getElementById('v-visible').value='true';
   nombreCupoManual=false;
   document.getElementById('tramos-wrap').innerHTML='';
@@ -1919,6 +1941,7 @@ async function guardarVuelo(){
     const itinerario=obtenerItinerario();
     // Itinerario obligatorio al CREAR un cupo (en edición no se fuerza, para no trabar cupos viejos)
     if(!editarVueloId&&itinerario.length===0){mostrarAlerta('modal-v-alert','Cargá al menos un tramo de itinerario para crear el cupo','error');setBtnLoading('btn-crear-vuelo',false,'Crear cupo');return;}
+    const numCalDias=id=>{const x=document.getElementById(id).value.trim();return x===''?null:Math.max(0,parseInt(x)||0);};
     const datos={
       temporada_id:document.getElementById('v-temporada').value,
       nombre,destino:document.getElementById('v-destino').value||null,
@@ -1930,7 +1953,11 @@ async function guardarVuelo(){
       precio_neto:parseFloat(document.getElementById('v-precio-neto').value)||null,
       condiciones_equipaje:document.getElementById('v-equipaje').value.trim()||null,
       visible:document.getElementById('v-visible').value==='true',
-      itinerario:itinerario.length>0?itinerario:null
+      itinerario:itinerario.length>0?itinerario:null,
+      cal_dias_pago_final:numCalDias('v-cal-pago'),
+      cal_dias_cancel_sin_gastos:numCalDias('v-cal-cancel-sin'),
+      cal_dias_cancel_con_gastos:numCalDias('v-cal-cancel-con'),
+      cal_usuarios:Array.from(document.querySelectorAll('.v-cal-user:checked')).map(c=>c.value)
     };
     if(editarVueloId){
       if(!Number.isInteger(total_lugares)||total_lugares<0){mostrarAlerta('modal-v-alert','Total de lugares inválido','error');setBtnLoading('btn-crear-vuelo',false,'Guardar cambios');return;}
