@@ -152,9 +152,9 @@
 <nav class="nav">
   <div class="nav-brand"><div class="nav-brand-icon">✈</div>Cupos Aéreos <span class="app-version" style="font-size:10px;color:var(--muted);font-weight:400;margin-left:6px"></span></div>
   <div class="nav-links" id="nav-links" style="display:none">
-    <button class="nav-link active" onclick="goTo('dashboard')">Dashboard</button>
+    <button class="nav-link active" id="nav-dashboard" onclick="goTo('dashboard')">Dashboard</button>
     <button class="nav-link" onclick="goTo('vuelos')">Cupos</button>
-    <button class="nav-link" onclick="goTo('misreservas')">Mis reservas</button>
+    <button class="nav-link" id="nav-misreservas" onclick="goTo('misreservas')">Mis reservas</button>
     <button class="nav-link" id="nav-admin" style="display:none" onclick="goTo('admin')">Administración</button>
   </div>
   <div class="nav-right">
@@ -173,9 +173,9 @@
 <!-- MOBILE MENU -->
 <div class="mobile-menu" id="mobile-menu" onclick="toggleMobileMenu()">
   <div class="mobile-menu-inner" onclick="event.stopPropagation()">
-    <button class="mobile-menu-btn" onclick="goTo('dashboard');toggleMobileMenu()">📊 Dashboard</button>
+    <button class="mobile-menu-btn" id="mobile-dashboard" onclick="goTo('dashboard');toggleMobileMenu()">📊 Dashboard</button>
     <button class="mobile-menu-btn" onclick="goTo('vuelos');toggleMobileMenu()">✈ Cupos</button>
-    <button class="mobile-menu-btn" onclick="goTo('misreservas');toggleMobileMenu()">🎫 Mis reservas</button>
+    <button class="mobile-menu-btn" id="mobile-misreservas" onclick="goTo('misreservas');toggleMobileMenu()">🎫 Mis reservas</button>
     <button class="mobile-menu-btn" id="mobile-admin" style="display:none" onclick="goTo('admin');toggleMobileMenu()">⚙️ Administración</button>
     <button class="mobile-menu-btn" onclick="cerrarSesion()" style="color:var(--red)">Cerrar sesión</button>
   </div>
@@ -217,7 +217,7 @@
     </div>
     <div style="display:flex;gap:12px;flex-wrap:wrap">
       <div style="display:flex;flex-direction:column;gap:3px"><label class="form-label" style="font-size:10px;margin:0">Filtrar cupos</label><input class="search-input" type="text" placeholder="Por nombre o ciudad" oninput="filtrarVuelos(this.value)"/></div>
-      <div style="display:flex;flex-direction:column;gap:3px"><label class="form-label" style="font-size:10px;margin:0">Buscar pasajero</label><input class="search-input" type="text" placeholder="🔎 En todos los cupos" oninput="buscarPasajeros(this.value)"/></div>
+      <div id="tp-buscar-pax" style="display:flex;flex-direction:column;gap:3px"><label class="form-label" style="font-size:10px;margin:0">Buscar pasajero</label><input class="search-input" type="text" placeholder="🔎 En todos los cupos" oninput="buscarPasajeros(this.value)"/></div>
     </div>
   </div>
   <div id="vuelos-content"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
@@ -421,7 +421,7 @@
     <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="u-nombre" placeholder="Nombre y apellido"/></div>
     <div class="form-group">
       <label class="form-label">Rol</label>
-      <select class="form-select" id="u-rol"><option value="vendedor">Vendedor</option><option value="admin">Admin</option></select>
+      <select class="form-select" id="u-rol"><option value="vendedor">Vendedor</option><option value="admin">Admin</option><option value="travel_partner">Travel Partner (solo lectura)</option></select>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" id="btn-eliminar-usuario" style="display:none;color:#dc2626;border-color:#dc2626" onclick="eliminarUsuario()">Eliminar acceso</button>
@@ -555,7 +555,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-19 (b33 · PDF: cantidad de pasajeros por nombre)';
+const APP_VERSION='Fase 2 · 2026-06-19 (b34 · rol Travel Partner: solo lectura)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,total_lugares,precio,condiciones_equipaje,creado_en,destino,localizador,itinerario,visible,itinerario_historial,cal_dias_pago_final,cal_dias_cancel_sin_gastos,cal_dias_cancel_con_gastos,cal_usuarios';
 // Calendarización: al crear un cupo, dispara (fire-and-forget) la creación de eventos en Google Calendar vía n8n.
@@ -683,7 +683,7 @@ async function iniciarSesion(session){
   vendedores=vends||[];
   // Poblar dropdown vendedor
   const sel=document.getElementById('p-vendedor');
-  sel.innerHTML='<option value="">Seleccionar...</option>'+vendedores.map(v=>`<option value="${esc(v.nombre)}">${esc(v.nombre)}</option>`).join('');
+  sel.innerHTML='<option value="">Seleccionar...</option>'+vendedores.filter(v=>v.rol!=='travel_partner').map(v=>`<option value="${esc(v.nombre)}">${esc(v.nombre)}</option>`).join('');
 
   document.getElementById('user-avatar').textContent=currentUser.email[0].toUpperCase();
   document.getElementById('user-avatar').style.display='flex';
@@ -703,9 +703,13 @@ function toggleMobileMenu(){document.getElementById('mobile-menu').classList.tog
 // ── VISTA PREVIA DE ROL (admin puede ver la app como vendedor) ──
 function aplicarRolEfectivoUI(){
   const adminUI=rolEfectivo==='admin';
+  const tp=rolEfectivo==='travel_partner';
   const na=document.getElementById('nav-admin'); if(na) na.style.display=adminUI?'block':'none';
   const ma=document.getElementById('mobile-admin'); if(ma) ma.style.display=adminUI?'block':'none';
-  const rb=document.getElementById('rol-badge'); if(rb) rb.textContent=adminUI?'Admin':'Vendedor';
+  // Travel Partner: solo "Cupos" (oculta Dashboard, Mis reservas y el buscador de pasajeros).
+  ['nav-dashboard','nav-misreservas','mobile-dashboard','mobile-misreservas'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=tp?'none':'';});
+  const bp=document.getElementById('tp-buscar-pax'); if(bp) bp.style.display=tp?'none':'';
+  const rb=document.getElementById('rol-badge'); if(rb) rb.textContent=tp?'Travel Partner':(adminUI?'Admin':'Vendedor');
   const vc=document.getElementById('ver-como'); if(vc&&currentRol==='admin'){vc.style.display='inline-block';vc.value=rolEfectivo;}
 }
 function cambiarVista(rol){
@@ -726,6 +730,8 @@ function cambiarVista(rol){
 let dashCargado=false,vuelosCargado=false,adminCargado=false;
 
 function goTo(s){
+  // Travel Partner: solo puede ver "Cupos" (y el detalle, vía goToDetalle).
+  if(rolEfectivo==='travel_partner' && s!=='vuelos') s='vuelos';
   document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(x=>x.classList.remove('active'));
   document.getElementById('screen-'+s).classList.add('active');
@@ -963,9 +969,16 @@ async function cargarVuelos(){
   if(!temporadaActiva&&tempsVisibles.length>0) temporadaActiva=tempsVisibles.find(t=>t.activa)?.id||tempsVisibles[0].id;
   document.getElementById('temp-selector-wrap').innerHTML=tempsVisibles.map(t=>`<button class="temp-btn ${t.id===temporadaActiva?'active':''}" onclick="seleccionarTemporada('${t.id}')">${esc(t.nombre)}${(rolEfectivo==='admin'&&!t.activa)?' <span class="badge badge-l" style="font-size:9px">inactiva</span>':''}</button>`).join('');
   if(!temporadaActiva){cont.innerHTML=`<div class="loading">No hay temporadas ${rolEfectivo==='admin'?'creadas':'activas'}</div>`;return;}
-  let qv=sb.from('vista_vuelos').select('*').eq('temporada_id',temporadaActiva);
-  if(rolEfectivo!=='admin') qv=qv.eq('visible',true);
-  const {data:vuelos}=await qv.order('nombre');
+  let vuelos;
+  if(rolEfectivo==='travel_partner'){
+    // El TP no puede leer vista_vuelos con contadores (no ve pasajeros): los trae por RPC definer (solo visibles, sin PII).
+    const {data}=await sb.rpc('tp_listar_cupos',{p_temporada_id:temporadaActiva});
+    vuelos=data||[];
+  } else {
+    let qv=sb.from('vista_vuelos').select('*').eq('temporada_id',temporadaActiva);
+    if(rolEfectivo!=='admin') qv=qv.eq('visible',true);
+    ({data:vuelos}=await qv.order('nombre'));
+  }
   vuelosData=vuelos||[];renderVuelos(vuelosData);
 }
 function seleccionarTemporada(id){temporadaActiva=id;cargarVuelos()}
@@ -1033,8 +1046,54 @@ async function ejecutarBusquedaPasajeros(q){
   cont.innerHTML=html;
 }
 
+// ── DETALLE (Travel Partner: read-only, sin datos de pasajeros) ──
+async function cargarDetalleTP(vueloId){
+  const cont=document.getElementById('detalle-content');
+  cont.innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
+  const {data:vuelo,error}=await sb.from('vuelos').select(VUELO_COLS).eq('id',vueloId).single();
+  if(error||!vuelo){cont.innerHTML='<div class="loading" style="color:var(--red)">Error</div>';return;}
+  currentVueloFecha=vuelo.fecha||null;
+  // Contadores: del listado ya cargado; si no está (nav directa), se traen por RPC.
+  let c=(vuelosData||[]).find(v=>v.id===vueloId);
+  if(!c){const {data:rpc}=await sb.rpc('tp_listar_cupos',{p_temporada_id:vuelo.temporada_id});c=(rpc||[]).find(v=>v.id===vueloId);}
+  const tot=c?.total??'—',vV=c?.vendidos??'—',rV=c?.reservados??'—',lV=c?.libres??'—';
+  let html=`<div class="detalle-header">
+    <div style="flex:1">
+      <div class="detalle-titulo">${esc(vuelo.nombre)}</div>
+      <div class="detalle-meta">
+        <span>📍 ${esc(vuelo.ciudad_nombre)}</span>
+        ${vuelo.destino?`<span class="badge ${regionBadge(vuelo.destino)}">${esc(vuelo.destino)}</span>`:''}
+        ${vuelo.fecha?`<span>📅 ${formatFecha(vuelo.fecha)}</span>`:''}
+        ${vuelo.aerolinea?`<span>✈ ${esc(vuelo.aerolinea)}</span>`:''}
+        ${vuelo.localizador?`<span style="color:var(--accent2)">🔑 ${esc(vuelo.localizador)}</span>`:''}
+        ${vuelo.precio?`<span style="color:var(--green);font-weight:500">Precio de Venta: USD ${Number(vuelo.precio).toLocaleString('es-UY')}</span>`:''}
+      </div>
+    </div>
+    <div class="detalle-actions">
+      <button class="btn btn-outline" onclick="goTo('vuelos')">← Volver</button>
+      <button class="btn btn-outline" onclick="imprimirItinerario('${vueloId}')">🖨 Imprimir / PDF</button>
+    </div>
+  </div>`;
+  html+=`<div class="info-panel">
+    <div class="info-item"><div class="info-item-label">Total</div><div class="info-item-value">${tot}</div></div>
+    <div class="info-item"><div class="info-item-label">Vendidos</div><div class="info-item-value c-red">${vV}</div></div>
+    <div class="info-item"><div class="info-item-label">Reservados</div><div class="info-item-value c-orange">${rV}</div></div>
+    <div class="info-item"><div class="info-item-label">Libres</div><div class="info-item-value c-green">${lV}</div></div>
+    ${vuelo.condiciones_equipaje?`<div class="info-item"><div class="info-item-label">Equipaje</div><div class="info-item-value" style="font-size:14px">${esc(vuelo.condiciones_equipaje)}</div></div>`:''}
+  </div>`;
+  if(vuelo.itinerario&&vuelo.itinerario.length>0){
+    html+=`<div class="itinerario-wrap"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:10px"><img src="${GUA_LOGO_BLANCO}" alt="Guamatur Viajes" style="height:22px"/><div class="itinerario-title" style="margin:0">✈ Itinerario del cupo</div></div></div>
+    <table class="itinerario-table"><thead><tr><th>Tipo</th><th>Fecha</th><th>Aerolínea</th><th>Vuelo</th><th>Origen</th><th>Destino</th><th>Salida</th><th>Llegada</th></tr></thead><tbody>`;
+    vuelo.itinerario.forEach(t=>{const tipo=t.tipo||'Ida';const badgeCls=tipo==='Vuelta'?'badge-orange':'badge-green';html+=`<tr><td><span class="badge ${badgeCls}">${esc(tipo)}</span></td><td>${esc(formatTramoFecha(t.fecha))}</td><td>${esc(t.aerolinea||vuelo.aerolinea)||'—'}</td><td>${esc(t.vuelo)||'—'}</td><td>${esc(t.origen)||'—'}</td><td>${esc(t.destino)||'—'}</td><td>${esc(t.salida)||'—'}</td><td>${esc(t.llegada)||'—'}</td></tr>`;});
+    html+='</tbody></table></div>';
+  }
+  html+=`<details style="margin-top:16px"><summary style="cursor:pointer;font-size:13px;color:var(--accent2);font-weight:500;padding:6px 0">📋 Condiciones generales de contratación</summary><div style="padding:8px 0;font-size:13px;color:var(--muted);line-height:1.7">${CONDICIONES_ITINERARIO.map((c,i)=>`${String(i+1).padStart(2,'0')}. ${esc(c)}`).join('<br>')}<div style="margin-top:10px;font-style:italic">${esc(CONDICIONES_NOTA)}</div></div></details>`;
+  cont.innerHTML=html;
+}
+
 // ── DETALLE ──────────────────────────────────────
 async function cargarDetalle(vueloId){
+  if(rolEfectivo==='travel_partner') return cargarDetalleTP(vueloId);
   const cont=document.getElementById('detalle-content');
   cont.innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
   const [{data:vuelo},{data:lugares},{data:infants}]=await Promise.all([
