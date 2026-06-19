@@ -158,9 +158,10 @@
     <button class="nav-link" id="nav-admin" style="display:none" onclick="goTo('admin')">Administración</button>
   </div>
   <div class="nav-right">
-    <select id="ver-como" onchange="cambiarVista(this.value)" title="Ver la app como Admin o como Vendedor" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;font-size:12px;padding:4px 8px;font-family:'DM Sans',sans-serif;cursor:pointer">
+    <select id="ver-como" onchange="cambiarVista(this.value)" title="Ver la app como Admin, Vendedor o Travel Partner" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;font-size:12px;padding:4px 8px;font-family:'DM Sans',sans-serif;cursor:pointer">
       <option value="admin">👁 Ver como: Admin</option>
       <option value="vendedor">👁 Ver como: Vendedor</option>
+      <option value="travel_partner">👁 Ver como: Travel Partner</option>
     </select>
     <span class="rol-badge" id="rol-badge" style="display:none"></span>
     <div class="avatar" id="user-avatar" style="display:none" title="Cerrar sesión" onclick="cerrarSesion()"></div>
@@ -555,7 +556,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-19 (b34 · rol Travel Partner: solo lectura)';
+const APP_VERSION='Fase 2 · 2026-06-19 (b35 · "Ver como: Travel Partner")';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,total_lugares,precio,condiciones_equipaje,creado_en,destino,localizador,itinerario,visible,itinerario_historial,cal_dias_pago_final,cal_dias_cancel_sin_gastos,cal_dias_cancel_con_gastos,cal_usuarios';
 // Calendarización: al crear un cupo, dispara (fire-and-forget) la creación de eventos en Google Calendar vía n8n.
@@ -714,8 +715,10 @@ function aplicarRolEfectivoUI(){
 }
 function cambiarVista(rol){
   if(currentRol!=='admin') return; // solo admins reales pueden simular vista
-  rolEfectivo=(rol==='vendedor')?'vendedor':'admin';
+  rolEfectivo=(rol==='vendedor')?'vendedor':(rol==='travel_partner')?'travel_partner':'admin';
   aplicarRolEfectivoUI();
+  // Travel Partner solo ve Cupos: aterrizar siempre ahí (con su lista/detalle read-only).
+  if(rolEfectivo==='travel_partner'){goTo('vuelos');return;}
   const act=document.querySelector('.screen.active');
   const id=act?act.id:'';
   if(id==='screen-admin'&&rolEfectivo!=='admin'){goTo('vuelos');return;}
