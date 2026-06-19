@@ -555,7 +555,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-15 (b32 · agenda: dispara webhook n8n al crear cupo)';
+const APP_VERSION='Fase 2 · 2026-06-19 (b33 · PDF: cantidad de pasajeros por nombre)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,total_lugares,precio,condiciones_equipaje,creado_en,destino,localizador,itinerario,visible,itinerario_historial,cal_dias_pago_final,cal_dias_cancel_sin_gastos,cal_dias_cancel_con_gastos,cal_usuarios';
 // Calendarización: al crear un cupo, dispara (fire-and-forget) la creación de eventos en Google Calendar vía n8n.
@@ -1692,7 +1692,7 @@ async function imprimirItinerario(vueloId,lugarId){
     const esC=libres<=3; // últimos lugares vendibles → vencimiento 24h; si no, 72h (excluye Operaciones)
     const lug=(lugs||[]).find(l=>l.id===lugarId);
     const p=lug?.pasajeros?.[0];
-    if(p&&p.status&&p.status!=='L'){const {texto:vTxt}=vencimientoReserva(p.fecha_reserva,esC);const vencTxt=p.status==='R'?(lug?.es_espera?'Lista de espera (sujeta a confirmación)':vTxt):'Confirmada (Vendido)';reserva={nombre:[p.primer_apellido,p.segundo_apellido,p.primer_nombre,p.segundo_nombre].filter(Boolean).join(' '),fecha:formatFechaHora(p.fecha_reserva),venc:vencTxt};}
+    if(p&&p.status&&p.status!=='L'){const {texto:vTxt}=vencimientoReserva(p.fecha_reserva,esC);const vencTxt=p.status==='R'?(lug?.es_espera?'Lista de espera (sujeta a confirmación)':vTxt):'Confirmada (Vendido)';const nomb=x=>[x.primer_apellido,x.segundo_apellido,x.primer_nombre,x.segundo_nombre].filter(Boolean).join(' ').trim().toLowerCase();const clave=nomb(p);const cant=(lugs||[]).filter(l=>{const x=l.pasajeros?.[0];return x&&x.status&&x.status!=='L'&&!x.cancelado&&nomb(x)===clave;}).length;reserva={nombre:[p.primer_apellido,p.segundo_apellido,p.primer_nombre,p.segundo_nombre].filter(Boolean).join(' '),fecha:formatFechaHora(p.fecha_reserva),venc:vencTxt,cant};}
   }
   const condItems=CONDICIONES_ITINERARIO.map((c,idx)=>`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px dashed #eee"><span style="background:${GUA_PRIMARY};color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:2px 7px;height:fit-content">${String(idx+1).padStart(2,'0')}</span><span style="font-size:12px;color:#333">${esc(c)}</span></div>`).join('');
   // El PDF se abre en ventana nueva (sin base URL): convertir el logo a URL absoluta
@@ -1724,7 +1724,7 @@ async function imprimirItinerario(vueloId,lugarId){
   .cond-nota{margin-top:12px;border:1px solid ${GUA_PRIMARY};border-radius:8px;padding:10px 13px;font-size:11.5px;color:#555;line-height:1.5}
   @media print{.noprint{display:none}}</style></head><body>
   <div class="head"><img src="${logoPdf}" alt="Guamatur Viajes"/><div style="text-align:right"><h1>${esc(v.nombre)}</h1><div class="meta">${esc(v.ciudad_nombre)}${v.fecha?' · '+formatFecha(v.fecha):''}${v.aerolinea?' · '+esc(v.aerolinea):''}${v.localizador?'<br>Localizador: '+esc(v.localizador):''}</div></div></div>
-  ${reserva?`<div class="reserva-box"><span class="rb-label">Pasajero:</span> ${esc(reserva.nombre)||'—'}<br><span class="rb-label">Fecha reserva:</span> <span class="rb-res">${esc(reserva.fecha)}</span><br><span class="rb-label">Fecha Vto reserva:</span> <span class="rb-venc">${esc(reserva.venc)}</span></div>`:''}
+  ${reserva?`<div class="reserva-box"><span class="rb-label">Pasajero:</span> ${esc(reserva.nombre)||'—'}<br><span class="rb-label">Pasajeros reservados a este nombre:</span> <span class="rb-res">${reserva.cant}</span><br><span class="rb-label">Fecha reserva:</span> <span class="rb-res">${esc(reserva.fecha)}</span><br><span class="rb-label">Fecha Vto reserva:</span> <span class="rb-venc">${esc(reserva.venc)}</span></div>`:''}
   <h2>Itinerario de vuelo</h2>
   ${it.length?`<table><thead><tr><th>Tipo</th><th>Fecha</th><th>Aerolínea</th><th>Vuelo</th><th>Origen</th><th>Destino</th><th>Salida</th><th>Llegada</th></tr></thead><tbody>${filas}</tbody></table>`:'<p>Sin itinerario cargado.</p>'}
   ${v.condiciones_equipaje?`<p style="margin-top:16px;font-size:13px"><b style="color:${GUA_PRIMARY}">Equipaje:</b> ${esc(v.condiciones_equipaje)}</p>`:''}
