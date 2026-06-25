@@ -556,7 +556,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-06-19 (b36 · editar temporadas)';
+const APP_VERSION='Fase 2 · 2026-06-25 (b37 · bajos auditoría B1/B2/B3/B5/M6)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,total_lugares,precio,condiciones_equipaje,creado_en,destino,localizador,itinerario,visible,itinerario_historial,cal_dias_pago_final,cal_dias_cancel_sin_gastos,cal_dias_cancel_con_gastos,cal_usuarios';
 // Calendarización: al crear un cupo, dispara (fire-and-forget) la creación de eventos en Google Calendar vía n8n.
@@ -837,7 +837,7 @@ async function cargarDashboard(){
   // Ranking vendedores
   const rankMap={};
   (pasajerosDash||[]).filter(p=>{
-    if(!vueloIds.has(p.vuelo_id)||p.status!=='V'||!p.vendedor) return false;
+    if(!vueloIds.has(p.vuelo_id)||p.status!=='V'||!p.vendedor||p.cancelado) return false;
     // Excluir lugares reducidos / de espera para que coincida con el KPI "Vendidos"
     const lug=Array.isArray(p.lugares)?p.lugares[0]:p.lugares;
     return !lug||(!lug.reducido&&!lug.es_espera);
@@ -1222,7 +1222,7 @@ async function cargarDetalle(vueloId){
     const btnPdf=(p&&st!=='L'&&!cancelado&&modo!=='reducido')?`<button class="btn-sm" title="Itinerario PDF de esta reserva (con fecha y vencimiento)" onclick="event.stopPropagation();imprimirItinerario('${vuelo.id}','${l.id}')">🖨 PDF</button>`:'';
     const accionCell=[(accion&&accion!=='—')?accion:'',btnPdf].filter(Boolean).join(' ')||accion;
     let h=`<tr class="${rowCls}">
-      <td style="font-family:'DM Mono',monospace;font-weight:500">${numVisible!=null?numVisible:l.numero_lugar}</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:500"${numVisible!=null&&numVisible!==l.numero_lugar?` title="Lugar interno ${l.numero_lugar} — es el que figura en el historial de actividad"`:''}>${numVisible!=null?numVisible:l.numero_lugar}</td>
       <td>${esc(p?.primer_apellido)||'—'}</td>
       <td>${esc(p?.segundo_apellido)||'—'}</td>
       <td>${esc(p?.primer_nombre)||'—'}</td>
@@ -1350,7 +1350,8 @@ async function guardarPasajero(){
   const factura=document.getElementById('p-factura').value.trim();
   const ficha=document.getElementById('p-ficha').value.trim();
   // Auto-promoción a Vendido: una reserva con factura + ficha cargadas pasa de R a V
-  if(status==='R'&&factura&&ficha) status='V';
+  const promovidoAV=(status==='R'&&factura&&ficha);
+  if(promovidoAV) status='V';
   if(status==='V'&&!factura){mostrarAlerta('modal-p-alert','Factura obligatoria para status V','error');return;}
   // INFANT: leer y validar ANTES de guardar (el alta pasajero+infant es atómica en la RPC)
   const tieneInfant=document.getElementById('p-tiene-infant').checked;
@@ -1373,7 +1374,7 @@ async function guardarPasajero(){
     }
     // Validación según status: V exige los 4 campos; R/L alcanza con primer apellido o nombre
     if(status==='V'){
-      if(!apellido1Inf||!apellido2Inf||!nombre1Inf||!nombre2Inf){mostrarAlerta('modal-p-alert','Para status V, el INFANT requiere los 4 campos (ambos apellidos y nombres)','error');return;}
+      if(!apellido1Inf||!apellido2Inf||!nombre1Inf||!nombre2Inf){mostrarAlerta('modal-p-alert',promovidoAV?'Al cargar factura + ficha la reserva pasó a VENDIDA, y una venta con INFANT requiere los 4 datos del infant (ambos apellidos y ambos nombres) para emitir el ticket. Si por ahora solo querés reservar, dejá la ficha vacía.':'Para status V, el INFANT requiere los 4 campos (ambos apellidos y ambos nombres)','error');return;}
     } else {
       if(!apellido1Inf&&!nombre1Inf){mostrarAlerta('modal-p-alert','Completá al menos primer apellido o primer nombre del infant','error');return;}
     }
@@ -1682,14 +1683,18 @@ async function confirmarCancelacion(){
   const penalidad=parseFloat(document.getElementById('c-penalidad').value)||0;
   const recupero=parseFloat(document.getElementById('c-recupero').value)||0;
   const errors=[];
-  let exitosos=0;
+  const exitososLugares=[];
   for(const l of seleccionados){
     // Write por RPC SECURITY DEFINER (admin-only): libera + borra infant + registra cancelación, atómico.
     const r=await conReintentoAuth(()=>sb.rpc('cancelar_lugar',{p_lugar_id:l.id,p_penalidad:penalidad,p_recupero:recupero}),'RPC cancelar_lugar');
     if(r?.error){console.error('[Cancelar] Error:',r.error);errors.push(`Lugar ${l.numero_lugar}: ${r.error.message}`);continue;}
-    exitosos++;
+    exitososLugares.push(l);
   }
-  await registrarLog('cancelar_reserva','vuelo',cancelarVueloId,{lugares:seleccionados.map(l=>l.numero_lugar),penalidad,recupero});
+  const exitosos=exitososLugares.length;
+  // B2: registrar log SOLO de lo efectivamente cancelado — no inventar una cancelación si fallan todas, ni inflar los lugares en una cancelación parcial.
+  if(exitososLugares.length){
+    await registrarLog('cancelar_reserva','vuelo',cancelarVueloId,{lugares:exitososLugares.map(l=>l.numero_lugar),penalidad,recupero});
+  }
   setBtnLoading('btn-confirmar-cancelar',false,'Confirmar cancelación');
   if(errors.length>0){
     const msg=exitosos>0
@@ -2113,14 +2118,17 @@ async function guardarVuelo(){
     } else {
       if(!total_lugares){mostrarAlerta('modal-v-alert','Total de lugares es obligatorio','error');setBtnLoading('btn-crear-vuelo',false,'Crear cupo');return;}
       datos.total_lugares=total_lugares;
-      const {data:vuelo,error}=await sb.from('vuelos').insert(datos).select('id').single();
+      // M6: alta ATÓMICA del cupo en la base (vuelo + lugares + bloqueo Operaciones + lista de espera en una sola transacción). Antes eran 4 escrituras sueltas: un fallo parcial dejaba un vuelo sin lugares.
+      const {data:nuevoId,error}=await sb.rpc('crear_cupo',{
+        p_temporada_id:datos.temporada_id,p_nombre:datos.nombre,p_destino:datos.destino,
+        p_ciudad_codigo:datos.ciudad_codigo,p_ciudad_nombre:datos.ciudad_nombre,p_aerolinea:datos.aerolinea,
+        p_localizador:datos.localizador,p_fecha:datos.fecha,p_precio:datos.precio,p_precio_neto:datos.precio_neto,
+        p_condiciones_equipaje:datos.condiciones_equipaje,p_visible:datos.visible,p_itinerario:datos.itinerario,
+        p_total_lugares:total_lugares,p_cal_dias_pago_final:datos.cal_dias_pago_final,
+        p_cal_dias_cancel_sin_gastos:datos.cal_dias_cancel_sin_gastos,p_cal_dias_cancel_con_gastos:datos.cal_dias_cancel_con_gastos,
+        p_cal_usuarios:datos.cal_usuarios});
       if(error){setBtnLoading('btn-crear-vuelo',false,'Crear cupo');mostrarAlerta('modal-v-alert',error.message,'error');return;}
-      const {error:errLug}=await sb.from('lugares').insert(Array.from({length:total_lugares},(_,i)=>({vuelo_id:vuelo.id,numero_lugar:i+1,es_infant:false})));
-      if(errLug){setBtnLoading('btn-crear-vuelo',false,'Crear cupo');mostrarAlerta('modal-v-alert','Vuelo creado pero error al crear lugares: '+errLug.message,'error');return;}
-      // Bloquear 3 últimos para Operaciones + crear lista de espera
-      await recalcularBloqueoOperaciones(vuelo.id);
-      await sb.from('lugares').insert(Array.from({length:6},(_,i)=>({vuelo_id:vuelo.id,numero_lugar:i+1,es_infant:false,es_espera:true})));
-      await registrarLog('crear_cupo','vuelo',vuelo.id,{nombre:datos.nombre,total:total_lugares});
+      await registrarLog('crear_cupo','vuelo',nuevoId,{nombre:datos.nombre,total:total_lugares});
       agendarEventosCupo(datos); // fire-and-forget: agenda eventos en Google Calendar vía n8n
       setBtnLoading('btn-crear-vuelo',false,'Crear cupo');
       mostrarAlerta('modal-v-alert',`Vuelo creado con ${total_lugares} lugares`,'success');
@@ -2341,14 +2349,16 @@ async function crearCuposMasivos(){
   let ok=0; const errores=[];
   for(const f of filas){
     try{
-      const datos={temporada_id,nombre:f.nombre,destino:f.destino,ciudad_codigo:f.ciudad_codigo,ciudad_nombre:f.ciudad_nombre,aerolinea:f.aerolinea,localizador:f.localizador,fecha:f.fecha,precio:f.precio,precio_neto:f.precio_neto,visible:true,itinerario:f.itinerario.length?f.itinerario:null,total_lugares:f.total_lugares};
-      const {data:vuelo,error}=await conReintentoAuth(()=>sb.from('vuelos').insert(datos).select('id').single(),'INSERT cupo masivo');
+      // M6: alta ATÓMICA del cupo en la base (vuelo + lugares + bloqueo Operaciones + lista de espera en una sola transacción). Antes eran 4 escrituras sueltas: un fallo parcial dejaba un vuelo sin lugares.
+      const {data:nuevoId,error}=await conReintentoAuth(()=>sb.rpc('crear_cupo',{
+        p_temporada_id:temporada_id,p_nombre:f.nombre,p_destino:f.destino,
+        p_ciudad_codigo:f.ciudad_codigo,p_ciudad_nombre:f.ciudad_nombre,p_aerolinea:f.aerolinea,
+        p_localizador:f.localizador,p_fecha:f.fecha,p_precio:f.precio,p_precio_neto:f.precio_neto,
+        p_condiciones_equipaje:null,p_visible:true,p_itinerario:f.itinerario.length?f.itinerario:null,
+        p_total_lugares:f.total_lugares,p_cal_dias_pago_final:null,p_cal_dias_cancel_sin_gastos:null,
+        p_cal_dias_cancel_con_gastos:null,p_cal_usuarios:null}),'RPC crear_cupo masivo');
       if(error){errores.push(`${f.nombre}: ${error.message}`);continue;}
-      const {error:eLug}=await sb.from('lugares').insert(Array.from({length:f.total_lugares},(_,k)=>({vuelo_id:vuelo.id,numero_lugar:k+1,es_infant:false})));
-      if(eLug){errores.push(`${f.nombre}: lugares ${eLug.message}`);continue;}
-      await recalcularBloqueoOperaciones(vuelo.id);
-      await sb.from('lugares').insert(Array.from({length:6},(_,k)=>({vuelo_id:vuelo.id,numero_lugar:k+1,es_infant:false,es_espera:true})));
-      await registrarLog('crear_cupo','vuelo',vuelo.id,{nombre:f.nombre,total:f.total_lugares,via:'masivo'});
+      await registrarLog('crear_cupo','vuelo',nuevoId,{nombre:f.nombre,total:f.total_lugares,via:'masivo'});
       ok++;
     }catch(e){errores.push(`${f.nombre}: ${e.message}`);}
   }
