@@ -330,6 +330,7 @@
       <div class="form-group"><label class="form-label">Ficha</label><input class="form-input" id="cf-ficha" placeholder="N° de ficha de Atlas"/></div>
       <div class="form-group"><label class="form-label">Factura <span style="color:var(--muted)">(con ficha → pasa a Vendido)</span></label><input class="form-input" id="cf-factura"/></div>
     </div>
+    <div class="form-group"><label class="form-label">Hotel <span style="color:var(--muted)">(se completa igual para todos; después podés cambiar alguno abajo)</span></label><input class="form-input" id="cf-hotel" placeholder="Ej: Hotel Atlântico" oninput="cfAplicarHotelATodos()"/></div>
     <div style="margin:10px 0"><button type="button" class="btn btn-primary" id="cf-traer" onclick="cargarFichaTraer()">📥 Traer de Atlas</button></div>
     <div id="cf-status" style="display:none;font-size:12px;margin:6px 0"></div>
     <div id="cf-mapa"></div>
@@ -593,7 +594,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-07-02 (b42 · fecha de reserva en vendidos)';
+const APP_VERSION='Fase 2 · 2026-07-03 (b43 · hotel para todos en carga desde ficha)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,total_lugares,precio,condiciones_equipaje,creado_en,destino,localizador,itinerario,visible,itinerario_historial,cal_dias_pago_final,cal_dias_cancel_sin_gastos,cal_dias_cancel_con_gastos,cal_usuarios';
 // Calendarización: al crear un cupo, dispara (fire-and-forget) la creación de eventos en Google Calendar vía n8n.
@@ -1481,6 +1482,7 @@ async function abrirModalCargarFicha(vueloId){
     .sort((a,b)=>a.numero-b.numero);
   document.getElementById('cf-ficha').value='';
   document.getElementById('cf-factura').value='';
+  document.getElementById('cf-hotel').value='';
   document.getElementById('cf-mapa').innerHTML='';
   document.getElementById('modal-cf-alert').innerHTML='';
   document.getElementById('cf-confirmar').style.display='none';
@@ -1514,20 +1516,23 @@ async function cargarFichaTraer(){
 }
 function renderCfMapa(marcadosInf){
   const opt=(sel)=>'<option value="">— sin asignar —</option>'+_cfPax.map((p,i)=>`<option value="${i}"${i===sel?' selected':''}>${esc(nombreAtlas(p))}${p.tipo==='INF'?' · (Atlas: INFANT)':''}</option>`).join('');
-  let h='<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:10px"><div style="font-size:12px;color:var(--muted);margin-bottom:8px">Asigná un pasajero a cada lugar (por defecto, en orden). Editable.</div>';
+  const gHotel=(document.getElementById('cf-hotel')?.value||'').trim();
+  let h='<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:10px"><div style="font-size:12px;color:var(--muted);margin-bottom:8px">Asigná un pasajero a cada lugar (por defecto, en orden) y revisá el hotel. Todo editable.</div>';
   _cfTargets.forEach((t,idx)=>{
-    h+=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span style="min-width:150px;font-size:12px;color:var(--muted)">Lugar #${t.numero}${t.ref?` · ${esc(t.ref)}`:''}</span><select class="form-select" id="cf-sel-${idx}" style="flex:1">${opt(idx<_cfPax.length?idx:-1)}</select></div>`;
+    const hv=esc(gHotel||t.hotel||'');
+    h+=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap"><span style="min-width:150px;font-size:12px;color:var(--muted)">Lugar #${t.numero}${t.ref?` · ${esc(t.ref)}`:''}</span><select class="form-select" id="cf-sel-${idx}" style="flex:1;min-width:140px">${opt(idx<_cfPax.length?idx:-1)}</select><input class="form-input" id="cf-hotel-${idx}" value="${hv}" placeholder="Hotel" style="flex:1;min-width:140px"/></div>`;
   });
   if(marcadosInf&&marcadosInf.length)h+=`<div style="font-size:11px;color:var(--yellow);margin-top:8px">ℹ️ Atlas marca ${marcadosInf.length} pasajero(s) como INFANT (puede no ser confiable en fichas viejas). Si alguno es un bebé que no lleva lugar, dejalo "sin asignar".</div>`;
   h+='</div>';
   document.getElementById('cf-mapa').innerHTML=h;
   document.getElementById('cf-confirmar').style.display='';
 }
+function cfAplicarHotelATodos(){const el=document.getElementById('cf-hotel');if(!el)return;const hv=el.value||'';_cfTargets.forEach((t,idx)=>{const ri=document.getElementById('cf-hotel-'+idx);if(ri)ri.value=hv;});}
 async function cargarFichaConfirmar(){
   const ficha=document.getElementById('cf-ficha').value.trim();
   const factura=document.getElementById('cf-factura').value.trim();
   const asign=[];
-  _cfTargets.forEach((t,idx)=>{const v=document.getElementById('cf-sel-'+idx)?.value;if(v!==''&&v!=null)asign.push({t,pax:_cfPax[+v]});});
+  _cfTargets.forEach((t,idx)=>{const v=document.getElementById('cf-sel-'+idx)?.value;if(v!==''&&v!=null){const h=(document.getElementById('cf-hotel-'+idx)?.value||'').trim();asign.push({t,pax:_cfPax[+v],hotel:h});}});
   if(!asign.length){mostrarAlerta('modal-cf-alert','Asigná al menos un pasajero a un lugar.','error');return;}
   const idxs=asign.map(a=>_cfPax.indexOf(a.pax));
   if(idxs.length!==new Set(idxs).size){if(!confirm('Asignaste el mismo pasajero a más de un lugar. ¿Continuar igual?'))return;}
@@ -1541,7 +1546,7 @@ async function cargarFichaConfirmar(){
         p_pasajero_id:a.t.pasajeroId,p_lugar_id:a.t.lugarId,p_vuelo_id:_cfVueloId,
         p_primer_apellido:a.pax.primer_apellido||'',p_segundo_apellido:a.pax.segundo_apellido||'',
         p_primer_nombre:a.pax.primer_nombre||'',p_segundo_nombre:a.pax.segundo_nombre||'',
-        p_hotel:a.t.hotel||'',p_vendedor:a.t.vendedor||'',p_ficha:ficha||null,
+        p_hotel:(a.hotel||a.t.hotel||''),p_vendedor:a.t.vendedor||'',p_ficha:ficha||null,
         p_comentarios:a.t.comentarios||null,p_status:status,p_factura:factura||null,
         p_fecha_reserva:null,p_tiene_infant:a.t.tieneInfant,p_inf:a.t.inf
       });
