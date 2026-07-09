@@ -460,7 +460,7 @@
     <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="u-nombre" placeholder="Nombre y apellido"/></div>
     <div class="form-group">
       <label class="form-label">Rol</label>
-      <select class="form-select" id="u-rol"><option value="vendedor">Vendedor</option><option value="admin">Admin</option><option value="travel_partner">Travel Partner (solo lectura)</option></select>
+      <select class="form-select" id="u-rol"><option value="vendedor">Vendedor</option><option value="operaciones">Operaciones</option><option value="admin">Admin</option><option value="super_admin">Super Administrador</option><option value="travel_partner">Travel Partner (solo lectura)</option></select>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" id="btn-eliminar-usuario" style="display:none;color:#dc2626;border-color:#dc2626" onclick="eliminarUsuario()">Eliminar acceso</button>
@@ -595,7 +595,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-07-05 (b47 · infant por edad a la fecha de REGRESO del cupo)';
+const APP_VERSION='Fase 2 · 2026-07-09 (b48 · roles nuevos: Super Admin + Operaciones —base—)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,fecha_regreso,total_lugares,precio,condiciones_equipaje,creado_en,destino,localizador,itinerario,visible,itinerario_historial,cal_dias_pago_final,cal_dias_cancel_sin_gastos,cal_dias_cancel_con_gastos,cal_usuarios';
 // Calendarización: al crear un cupo, dispara (fire-and-forget) la creación de eventos en Google Calendar vía n8n.
@@ -720,7 +720,8 @@ async function iniciarSesion(session){
   // Sincronizar el ID con el de Google en el primer login (vía RPC; no bloquea el login si falla)
   if(u.id!==currentUser.id){try{await sb.rpc('sync_mi_usuario_id');}catch(e){console.warn('sync id usuario:',e);}}
   currentRol=u.rol;
-  rolEfectivo=u.rol;
+  // super_admin se comporta como admin en la UI (Ola 0: super admin = admin). El rol real queda en currentRol.
+  rolEfectivo=(u.rol==='super_admin')?'admin':u.rol;
   // Cargar vendedores
   const {data:vends,error:ve}=await sb.from('usuarios').select('nombre,email,rol').order('nombre');
   console.log('vendedores cargados:',vends?.length,ve);
@@ -753,11 +754,11 @@ function aplicarRolEfectivoUI(){
   // Travel Partner: solo "Cupos" (oculta Dashboard, Mis reservas y el buscador de pasajeros).
   ['nav-dashboard','nav-misreservas','mobile-dashboard','mobile-misreservas'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=tp?'none':'';});
   const bp=document.getElementById('tp-buscar-pax'); if(bp) bp.style.display=tp?'none':'';
-  const rb=document.getElementById('rol-badge'); if(rb) rb.textContent=tp?'Travel Partner':(adminUI?'Admin':'Vendedor');
-  const vc=document.getElementById('ver-como'); if(vc&&currentRol==='admin'){vc.style.display='inline-block';vc.value=rolEfectivo;}
+  const rb=document.getElementById('rol-badge'); if(rb) rb.textContent=rolLabel(rolEfectivo);
+  const vc=document.getElementById('ver-como'); if(vc&&(currentRol==='admin'||currentRol==='super_admin')){vc.style.display='inline-block';vc.value=rolEfectivo;}
 }
 function cambiarVista(rol){
-  if(currentRol!=='admin') return; // solo admins reales pueden simular vista
+  if(currentRol!=='admin'&&currentRol!=='super_admin') return; // solo admins reales pueden simular vista
   rolEfectivo=(rol==='vendedor')?'vendedor':(rol==='travel_partner')?'travel_partner':'admin';
   aplicarRolEfectivoUI();
   // Travel Partner solo ve Cupos: aterrizar siempre ahí (con su lista/detalle read-only).
@@ -2165,10 +2166,12 @@ async function toggleActivaTemporada(id,actual){
   cargarAdmin();
 }
 
+const ROL_LABELS={super_admin:'Super Admin',admin:'Admin',operaciones:'Operaciones',vendedor:'Vendedor',travel_partner:'Travel Partner'};
+function rolLabel(r){return ROL_LABELS[r]||r||'—';}
 function renderUsuarios(){
   const el=document.getElementById('admin-usuarios');if(!el)return;
   if(!usuariosAdmin.length){el.innerHTML='<div style="font-size:13px;color:var(--muted)">Sin usuarios.</div>';return;}
-  el.innerHTML=usuariosAdmin.map(u=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px"><div style="min-width:0;flex:1"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(u.nombre||u.email)}</div><div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(u.email)}</div></div><span class="badge ${u.rol==='admin'?'badge-green':'badge-l'}">${u.rol==='admin'?'Admin':'Vendedor'}</span><button class="btn-sm" onclick="abrirModalUsuario('${esc(u.email)}')">Editar</button></div>`).join('');
+  el.innerHTML=usuariosAdmin.map(u=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px"><div style="min-width:0;flex:1"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(u.nombre||u.email)}</div><div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(u.email)}</div></div><span class="badge ${(u.rol==='admin'||u.rol==='super_admin')?'badge-green':'badge-l'}">${rolLabel(u.rol)}</span><button class="btn-sm" onclick="abrirModalUsuario('${esc(u.email)}')">Editar</button></div>`).join('');
 }
 
 function abrirModalUsuario(email){
