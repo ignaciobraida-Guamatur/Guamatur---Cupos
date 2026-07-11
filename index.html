@@ -597,9 +597,9 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-07-11 (b55 · login sugiere dominio guamatur.com · Ola 0 seguridad: whitelist server-side + auditoría de raíz)';
+const APP_VERSION='Fase 2 · 2026-07-11 (b56 · localizador/PNR oculto al Travel Partner: fuera de VUELO_COLS, se trae por RPC gateada get_localizador · Ola 1)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
-const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,fecha_regreso,total_lugares,precio,condiciones_equipaje,creado_en,destino,localizador,itinerario,visible,itinerario_historial,cal_dias_pago_final,cal_dias_cancel_sin_gastos,cal_dias_cancel_con_gastos,cal_usuarios';
+const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,fecha_regreso,total_lugares,precio,condiciones_equipaje,creado_en,destino,itinerario,visible,itinerario_historial,cal_dias_pago_final,cal_dias_cancel_sin_gastos,cal_dias_cancel_con_gastos,cal_usuarios';
 // Calendarización: al crear un cupo, dispara (fire-and-forget) la creación de eventos en Google Calendar vía n8n.
 const N8N_WEBHOOK_AGENDA='https://guamatur.app.n8n.cloud/webhook/cupo-agenda';
 async function agendarEventosCupo(v){
@@ -1164,7 +1164,6 @@ async function cargarDetalleTP(vueloId){
         ${vuelo.destino?`<span class="badge ${regionBadge(vuelo.destino)}">${esc(vuelo.destino)}</span>`:''}
         ${vuelo.fecha?`<span>📅 ${formatFecha(vuelo.fecha)}</span>`:''}
         ${vuelo.aerolinea?`<span>✈ ${esc(vuelo.aerolinea)}</span>`:''}
-        ${vuelo.localizador?`<span style="color:var(--accent2)">🔑 ${esc(vuelo.localizador)}</span>`:''}
         ${vuelo.precio?`<span style="color:var(--green);font-weight:500">Precio de Venta: USD ${Number(vuelo.precio).toLocaleString('es-UY')}</span>`:''}
       </div>
     </div>
@@ -1203,6 +1202,9 @@ async function cargarDetalle(vueloId){
   // El precio neto no viaja en el select (revocado a authenticated); el admin lo trae por RPC gateada
   let precioNetoAdmin=null;
   if(rolEfectivo==='admin'&&vuelo){const {data:pn}=await sb.rpc('admin_get_precio_neto',{p_vuelo_id:vueloId});precioNetoAdmin=pn;}
+  // El localizador (PNR del operador) tampoco viaja en el select (revocado a authenticated); se trae por RPC gateada (excluye Travel Partner).
+  let localizadorCupo=null;
+  if(vuelo){const {data:loc}=await sb.rpc('get_localizador',{p_vuelo_id:vueloId});localizadorCupo=loc;}
   if(!vuelo||!lugares){cont.innerHTML='<div class="loading" style="color:var(--red)">Error</div>';return;}
   currentVueloFecha=vuelo.fecha||null;
   currentVueloFechaRegreso=vuelo.fecha_regreso||vuelo.fecha||null;
@@ -1242,7 +1244,7 @@ async function cargarDetalle(vueloId){
         ${vuelo.destino?`<span class="badge ${regionBadge(vuelo.destino)}">${esc(vuelo.destino)}</span>`:''}
         ${vuelo.fecha?`<span>📅 ${formatFecha(vuelo.fecha)}</span>`:''}
         ${vuelo.aerolinea?`<span>✈ ${esc(vuelo.aerolinea)}</span>`:''}
-        ${vuelo.localizador?`<span style="color:var(--accent2)">🔑 ${esc(vuelo.localizador)}</span>`:''}
+        ${localizadorCupo?`<span style="color:var(--accent2)">🔑 ${esc(localizadorCupo)}</span>`:''}
         ${vuelo.precio?`<span style="color:var(--green);font-weight:500">Precio de Venta: USD ${Number(vuelo.precio).toLocaleString('es-UY')}</span>`:''}
         ${esAdmin&&precioNetoAdmin?`<span style="color:var(--yellow);font-weight:500">Neto: USD ${Number(precioNetoAdmin).toLocaleString('es-UY')}</span>`:''}
       </div>
@@ -2374,7 +2376,7 @@ async function abrirEditarVuelo(vueloId){
       renderCiudadesOpciones(v.destino||'',`${v.ciudad_codigo}|${v.ciudad_nombre}`);
       document.getElementById('v-nombre').value=v.nombre||'';
       document.getElementById('v-aerolinea').value=v.aerolinea||'';
-      document.getElementById('v-localizador').value=v.localizador||'';
+      {const {data:locEd}=await sb.rpc('get_localizador',{p_vuelo_id:vueloId});document.getElementById('v-localizador').value=locEd||'';}
       document.getElementById('v-fecha').value=v.fecha?v.fecha.substring(0,10):'';
       document.getElementById('v-fecha-regreso').value=v.fecha_regreso?v.fecha_regreso.substring(0,10):'';
       // Precargar "Total lugares" con el conteo REAL de lugares activos (no el total_lugares almacenado,
