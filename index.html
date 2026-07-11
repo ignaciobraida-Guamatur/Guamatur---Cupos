@@ -597,7 +597,7 @@ const sb=supabase.createClient('https://pjxdysmegbzcrgarcmwy.supabase.co','eyJhb
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-07-11 (b56 · localizador/PNR oculto al Travel Partner: fuera de VUELO_COLS, se trae por RPC gateada get_localizador · Ola 1)';
+const APP_VERSION='Fase 2 · 2026-07-11 (b57 · reducir total de cupo borra lugares por RPC borrar_lugares_vacios (valida vacío server-side); DELETE directo de lugares cerrado · Ola 1)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,fecha_regreso,total_lugares,precio,condiciones_equipaje,creado_en,destino,itinerario,visible,itinerario_historial,cal_dias_pago_final,cal_dias_cancel_sin_gastos,cal_dias_cancel_con_gastos,cal_usuarios';
 // Calendarización: al crear un cupo, dispara (fire-and-forget) la creación de eventos en Google Calendar vía n8n.
@@ -2484,7 +2484,7 @@ async function guardarVuelo(){
         if(ocupado){setBtnLoading('btn-crear-vuelo',false,'Guardar cambios');mostrarAlerta('modal-v-alert',`No se puede reducir: el lugar #${ocupado.numero_lugar} tiene pasajero o cancelación. Liberalo primero (o usá "Reducción de lugares").`,'error');return;}
         if(!confirm(`⚠️ Vas a BAJAR el total de lugares de ${cantidadActual} a ${total_lugares}: se ELIMINAN definitivamente ${cantidadActual-total_lugares} lugar(es) vacíos (#${[...aBorrar].map(l=>l.numero_lugar).sort((a,b)=>a-b).join(', #')}). No se puede deshacer. ¿Confirmás?`)){setBtnLoading('btn-crear-vuelo',false,'Guardar cambios');return;}
         const idsBorrar=aBorrar.map(l=>l.id);
-        const {error:errDel}=await sb.from('lugares').delete().in('id',idsBorrar);
+        const {error:errDel}=await sb.rpc('borrar_lugares_vacios',{p_vuelo_id:editarVueloId,p_ids:idsBorrar});
         if(errDel){setBtnLoading('btn-crear-vuelo',false,'Guardar cambios');mostrarAlerta('modal-v-alert','Error al reducir lugares: '+errDel.message,'error');return;}
       }
       datos.total_lugares=total_lugares;
