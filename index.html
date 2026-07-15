@@ -665,7 +665,7 @@ const CONFIG={
   APP_URL:'https://ignaciobraida-guamatur.github.io/Guamatur---Cupos/',
   OAUTH_DOMINIO:'guamatur.com',
   N8N_WEBHOOK_AGENDA:'https://guamatur.app.n8n.cloud/webhook/cupo-agenda',
-  N8N_WEBHOOK_ITINERARIO:'', // APAGADO hasta activar el workflow n8n fc3quyEIBc64Fzum con credencial Gmail. Para prenderlo: 'https://guamatur.app.n8n.cloud/webhook/cambio-itinerario'. Vacío = no aparece el confirm ni se dispara.
+  N8N_WEBHOOK_ITINERARIO:'https://guamatur.app.n8n.cloud/webhook/cambio-itinerario', // ACTIVO desde 2026-07-15 (workflow fc3quyEIBc64Fzum, remitente diego.busch@; probado e2e). Vacío = no aparece el confirm ni se dispara.
   WEBHOOK_SECRET:'5f6a2344303e1643670007a2305c6013f21349abed333db07f4a5013fe4e8970',
   AGENDA_INVITADOS:[
     {email:'diego.busch@guamatur.com',nombre:'Diego Busch'},
@@ -694,7 +694,7 @@ const sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY,{
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-07-15 (b67 · delegación "asiste en ventas": un vendedor puede operar las fichas de otro a quien asiste, con paridad total y auditoría del actor real)';
+const APP_VERSION='Fase 2 · 2026-07-15 (b68 · aviso de cambio de itinerario PRENDIDO: al editar el itinerario de un cupo a la venta, avisa por mail al equipo, remitente diego.busch@)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,fecha_regreso,total_lugares,precio,condiciones_equipaje,creado_en,destino,itinerario,visible,itinerario_historial,cal_dias_pago_final,cal_dias_cancel_sin_gastos,cal_dias_cancel_con_gastos,cal_usuarios';
 // Calendarización: al crear un cupo, dispara (fire-and-forget) la creación de eventos en Google Calendar vía n8n.
