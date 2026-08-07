@@ -751,7 +751,7 @@ const sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY,{
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-08-06 (b79 · mejoras pedidas por el equipo de administradores. TANDA 1: la columna de acciones de la planilla queda FIJA a la derecha (el scroll horizontal tapaba Editar/Desbloquear) · las tablas del dashboard y la lista de cupos se ORDENAN por cabezal (flechas en los títulos; lo que más se pedía era agrupar por región) · el botón Editar del pasajero se destaca · aviso al guardar si falta el SEGUNDO APELLIDO (aviso, no candado). TANDA 2: estado EMITIDO del cupo — cuando aéreos emite, el cupo se congela y no lo toca nadie (candado en la base, lo marca y lo saca un admin) · aviso si el LOCALIZADOR ya está en otro cupo (aviso, no bloqueo: el PNR se repite legítimamente en multi-tramo) · MOVIMIENTO POR PERÍODO en el dashboard: reservados, vendidos y reservas descartadas entre dos fechas, exportable)';
+const APP_VERSION='Fase 2 · 2026-08-07 (b80 · los lugares que Operaciones tiene bloqueados AHORA CUENTAN COMO STOCK para el plazo de vencimiento: antes se excluían y un cupo con reserva de Operaciones parecía al límite sin estarlo, así que cualquier reserva nacía con 24 h. El umbral sigue igual, ≤3 lugares libres = 24 h, si no 72 h) · (b79 · mejoras pedidas por el equipo de administradores. TANDA 1: la columna de acciones de la planilla queda FIJA a la derecha (el scroll horizontal tapaba Editar/Desbloquear) · las tablas del dashboard y la lista de cupos se ORDENAN por cabezal (flechas en los títulos; lo que más se pedía era agrupar por región) · el botón Editar del pasajero se destaca · aviso al guardar si falta el SEGUNDO APELLIDO (aviso, no candado). TANDA 2: estado EMITIDO del cupo — cuando aéreos emite, el cupo se congela y no lo toca nadie (candado en la base, lo marca y lo saca un admin) · aviso si el LOCALIZADOR ya está en otro cupo (aviso, no bloqueo: el PNR se repite legítimamente en multi-tramo) · MOVIMIENTO POR PERÍODO en el dashboard: reservados, vendidos y reservas descartadas entre dos fechas, exportable)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 // ⚠️ Toda columna que se agregue acá necesita `grant select (col) to authenticated` en la base, si no
 // PostgREST tira 400 y se cae la pantalla entera (gotcha #6). `emitido` viene de la migración 2026-08-06.
@@ -1587,8 +1587,15 @@ async function cargarDetalle(vueloId){
   const libresArr=lugaresActivos.filter(l=>!l.pasajeros?.[0]||l.pasajeros[0].status==='L');
   const lV=libresArr.length;
   // "Últimos lugares" (vencimiento 24h) = últimos lugares VENDIBLES: se excluyen los de Operaciones.
-  // Debe coincidir con vencer_reservas() en el servidor, si no el vencimiento mostrado no matchea la baja automática.
-  const esVueloC=libresArr.filter(l=>!l.bloqueado_operaciones).length<=3;
+  // Debe coincidir con vencer_reservas() Y avisos_vencimiento_pendientes() en el servidor, si no el
+  // vencimiento mostrado (y el que se avisa por mail) no matchea la baja automática.
+  // Los lugares que Operaciones tiene bloqueados SÍ cuentan como stock (decisión de Nacho, 7-ago-2026).
+  // Antes se excluían, y en un cupo donde Operaciones guardaba varios lugares el cupo parecía al límite
+  // cuando no lo estaba: caso real "Recife - AZUL - 04OCT" (3 bloqueados) donde CUALQUIER reserva nacía
+  // con 24 h. Migración db/2026-08-07-vencimiento-operaciones-cuenta-como-stock.sql — este conteo tiene
+  // que ser idéntico al de vencer_reservas() y avisos_vencimiento_pendientes(), o la fecha que se muestra
+  // (y la que se avisa por mail) no va a ser la que aplique el servidor.
+  const esVueloC=libresArr.length<=3;
   const esAdmin=rolEfectivo==='admin';
   const esOper=rolEfectivo==='operaciones';   // Ola 3: Operaciones edita cualquier ficha + (des)bloquea lugares
   const infantMap={};
