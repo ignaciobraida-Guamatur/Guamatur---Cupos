@@ -751,7 +751,10 @@ const sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY,{
   }
 });
 
-const APP_VERSION='Fase 2 · 2026-08-07 (b80 · los lugares que Operaciones tiene bloqueados AHORA CUENTAN COMO STOCK para el plazo de vencimiento: antes se excluían y un cupo con reserva de Operaciones parecía al límite sin estarlo, así que cualquier reserva nacía con 24 h. El umbral sigue igual, ≤3 lugares libres = 24 h, si no 72 h) · (b79 · mejoras pedidas por el equipo de administradores. TANDA 1: la columna de acciones de la planilla queda FIJA a la derecha (el scroll horizontal tapaba Editar/Desbloquear) · las tablas del dashboard y la lista de cupos se ORDENAN por cabezal (flechas en los títulos; lo que más se pedía era agrupar por región) · el botón Editar del pasajero se destaca · aviso al guardar si falta el SEGUNDO APELLIDO (aviso, no candado). TANDA 2: estado EMITIDO del cupo — cuando aéreos emite, el cupo se congela y no lo toca nadie (candado en la base, lo marca y lo saca un admin) · aviso si el LOCALIZADOR ya está en otro cupo (aviso, no bloqueo: el PNR se repite legítimamente en multi-tramo) · MOVIMIENTO POR PERÍODO en el dashboard: reservados, vendidos y reservas descartadas entre dos fechas, exportable)';
+// ⚠️ Una sola versión por cadena y CORTA: el detalle va al CHANGELOG.md, no acá. Nacho ve este texto
+// completo en el encabezado (el resto ve solo el "bNN") y si es largo se desborda; además `APP_VERSION_CORTA`
+// saca el número con un match, así que dos "bNN" en la misma cadena confunden cuál es la versión.
+const APP_VERSION='Fase 2 · 2026-08-07 (b80 · los lugares bloqueados por Operaciones ahora cuentan como stock para el plazo de vencimiento: el umbral sigue igual (≤3 libres = 24 h, si no 72 h), pero un cupo con reserva de Operaciones ya no parece al límite sin estarlo)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 // ⚠️ Toda columna que se agregue acá necesita `grant select (col) to authenticated` en la base, si no
 // PostgREST tira 400 y se cae la pantalla entera (gotcha #6). `emitido` viene de la migración 2026-08-06.
