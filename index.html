@@ -113,7 +113,9 @@
      amarillo (.btn-warning) = precaución reversible (Reducir) · rojo (.btn-danger) = destructiva */
   .btn-danger{background:rgba(255,59,59,0.15);color:var(--red);border:1px solid rgba(255,59,59,0.35)}.btn-danger:hover{background:rgba(255,59,59,0.25)}
   .btn-excel{background:transparent;color:var(--text);border:1px solid var(--border2);font-size:12px;padding:5px 12px}.btn-excel:hover{background:var(--surface2)}
-  .btn-sm{padding:3px 8px;font-size:11px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif}
+  /* white-space:nowrap — sin esto "Bloquear Oper" se parte en dos líneas y estira TODAS las filas
+     de la planilla a casi el doble de alto (b83). */
+  .btn-sm{padding:3px 8px;font-size:11px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap}
   .btn-sm:hover{background:var(--surface2)}
   /* Toggles sensibles (Ola 2 #51): azul = bloqueo Operaciones por fila · ámbar = visibilidad/estado global */
   .btn-sm-oper{border-color:rgba(96,165,250,0.45);color:var(--blue);background:rgba(96,165,250,0.08)}.btn-sm-oper:hover{background:rgba(96,165,250,0.18)}
@@ -288,6 +290,12 @@
       <div class="admin-card-title">Usuarios</div>
       <button class="btn btn-primary" style="width:100%" onclick="abrirModalUsuario()">+ Nuevo usuario</button>
       <div id="admin-usuarios" style="margin-top:12px"></div>
+    </div>
+    <div class="admin-card">
+      <div class="admin-card-title">Acciones comerciales <span style="color:var(--muted);font-size:11px;font-weight:400">(preventa, Black Friday…)</span></div>
+      <button class="btn btn-primary" style="width:100%" onclick="abrirModalAccion()">+ Nueva acción</button>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">Las etiquetas se le ponen a los lugares desde “⚙ Gestionar cupo”. Los lugares marcados no se bloquean.</div>
+      <div id="admin-acciones" style="margin-top:12px"></div>
     </div>
   </div>
   <div class="admin-card" style="margin-top:16px">
@@ -501,6 +509,62 @@
   </div>
 </div>
 
+<!-- MODAL CREAR / EDITAR ACCIÓN COMERCIAL (b82, solo admin) -->
+<div id="modal-accion" class="modal-overlay" style="display:none">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title" id="modal-accion-titulo">Nueva acción comercial</div>
+    <div id="modal-accion-alert"></div>
+    <div class="form-group">
+      <label class="form-label">Nombre</label>
+      <input class="form-input" id="acc-nombre" placeholder="Ej: Pre venta Verano 2027" maxlength="60"/>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Color</label>
+        <input class="form-input" id="acc-color" type="color" value="#7c6ffd" style="height:40px;padding:4px"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Estado</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:8px;cursor:pointer">
+          <input type="checkbox" id="acc-activa" checked/> Activa (se puede asignar)
+        </label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="cerrarModal('modal-accion')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-guardar-accion" onclick="guardarAccion()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ACCIONES COMERCIALES DEL CUPO (b82, solo admin) -->
+<div id="modal-acciones-cupo" class="modal-overlay" style="display:none">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-title">Acciones comerciales</div>
+    <div id="modal-acc-alert"></div>
+    <div style="background:rgba(124,111,253,0.08);border:1px solid rgba(124,111,253,0.2);border-radius:8px;padding:10px;font-size:13px;color:var(--accent2);margin-bottom:16px">
+      Marcá los lugares que van para una acción comercial (preventa, Black Friday…). <b>No se bloquean</b>: el vendedor los puede reservar normalmente. La marca queda aunque se reserven o se vendan, que es lo que permite después ver cómo viene la acción.
+    </div>
+    <div class="form-group">
+      <label class="form-label">Acción a aplicar</label>
+      <select class="form-select" id="acc-selector"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Lugares <span id="acc-contador" style="color:var(--muted)"></span></label>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn-sm" type="button" onclick="accMarcarTodos(true)">Marcar todos</button>
+        <button class="btn-sm" type="button" onclick="accMarcarTodos(false)">Desmarcar todos</button>
+      </div>
+      <div id="acc-lugares" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="cerrarModal('modal-acciones-cupo')">Cerrar</button>
+      <button class="btn btn-outline" id="btn-quitar-accion" onclick="aplicarAccionLugares(true)">Quitar la etiqueta</button>
+      <button class="btn btn-primary" id="btn-aplicar-accion" onclick="aplicarAccionLugares(false)">Aplicar acción</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL ESTIRAR VENCIMIENTO (admin y Operaciones) -->
 <div id="modal-estirar" class="modal-overlay" style="display:none">
   <div class="modal" style="max-width:820px">
@@ -640,15 +704,11 @@
       <div class="form-group full"><label class="form-label">Condiciones de equipaje</label><textarea class="form-textarea" id="v-equipaje" placeholder="Ej: 1 carry on + 1 equipaje en bodega 23kg"></textarea></div>
     </div>
     <div style="margin-bottom:14px;border-top:1px solid var(--border);padding-top:12px">
-      <label class="form-label">📅 Agenda de eventos (Google Calendar) <span style="color:var(--muted);font-size:10px">días antes de la salida · dejá vacío el que No aplique</span></label>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px">
-        <div><label class="form-label" style="font-size:11px">Pago final</label><input class="form-input" id="v-cal-pago" type="number" min="0" placeholder="No aplica"/></div>
-        <div><label class="form-label" style="font-size:11px">Cancelación sin gastos</label><input class="form-input" id="v-cal-cancel-sin" type="number" min="0" placeholder="No aplica"/></div>
-        <div><label class="form-label" style="font-size:11px">Cancelación con gastos</label><input class="form-input" id="v-cal-cancel-con" type="number" min="0" placeholder="No aplica"/></div>
-      </div>
-      <label class="form-label" style="font-size:11px;margin-top:10px;display:block">Agendar a:</label>
-      <!-- Se puebla desde CONFIG.AGENDA_INVITADOS (Ola 4 #93) -->
-      <div id="v-cal-users" style="display:flex;flex-wrap:wrap;gap:14px;margin-top:4px"></div>
+      <label class="form-label">📅 Agenda de eventos (Google Calendar) <span style="color:var(--muted);font-size:10px">una columna por vencimiento: los días antes de la salida y quién lo recibe</span></label>
+      <!-- b85: la grilla se arma en JS desde CAL_EVENTOS x CONFIG.AGENDA_INVITADOS (Ola 4 #93).
+           Los inputs de días conservan sus IDs históricos (v-cal-pago / v-cal-cancel-sin / v-cal-cancel-con). -->
+      <div id="v-cal-grid" style="margin-top:8px;overflow-x:auto"></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">Un vencimiento se agenda solo si tiene días <b>y</b> al menos una persona marcada. Tocá el nombre del vencimiento para marcar o desmarcar toda la columna.</div>
     </div>
     <div style="margin-bottom:14px">
       <details style="margin-bottom:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
@@ -784,13 +844,46 @@ const sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY,{
 // ⚠️ Una sola versión por cadena y CORTA: el detalle va al CHANGELOG.md, no acá. Nacho ve este texto
 // completo en el encabezado (el resto ve solo el "bNN") y si es largo se desborda; además `APP_VERSION_CORTA`
 // saca el número con un match, así que dos "bNN" en la misma cadena confunden cuál es la versión.
-const APP_VERSION='Fase 2 · 2026-08-13 (b81 · ESTIRAR VENCIMIENTO: admin y Operaciones le pueden dar más horas a una reserva desde el cupo, eligiendo cuáles y cuántas. No cambia la fecha de reserva —las horas se suman aparte— y queda registrado quién lo hizo. Además, "Mis reservas" mostraba el vencimiento con la regla vieja y ahora coincide con la planilla)';
+const APP_VERSION='Fase 2 · 2026-08-26 (b85 · AGENDA POR VENCIMIENTO: en el cupo, cada vencimiento —pago final, cancelación sin gastos, cancelación con gastos— tiene ahora SUS destinatarios. Antes era una sola lista para los tres y a todos les llegaba todo. La grilla es una columna por vencimiento (los días y quién lo recibe) y una fila por persona; tocando el nombre del vencimiento se marca o desmarca la columna entera. Un vencimiento sin nadie marcado no se agenda. Los cupos ya cargados quedan igual que antes: la lista que tenían pasa a los tres. Pedido de Diego Busch)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 // ⚠️ Toda columna que se agregue acá necesita `grant select (col) to authenticated` en la base, si no
 // PostgREST tira 400 y se cae la pantalla entera (gotcha #6). `emitido` viene de la migración 2026-08-06.
 const VUELO_COLS='id,temporada_id,nombre,ciudad_codigo,ciudad_nombre,aerolinea,fecha,fecha_regreso,total_lugares,precio,condiciones_equipaje,creado_en,destino,itinerario,visible,itinerario_historial,cal_dias_pago_final,cal_dias_cancel_sin_gastos,cal_dias_cancel_con_gastos,cal_usuarios,emitido,emitido_en,emitido_por';
 // Calendarización: al crear un cupo, dispara (fire-and-forget) la creación de eventos en Google Calendar vía n8n.
 const N8N_WEBHOOK_AGENDA=CONFIG.N8N_WEBHOOK_AGENDA;
+// b85 (pedido Diego, 23-jul): los tres vencimientos del cupo tienen destinatarios PROPIOS. Antes era una
+// sola lista para los tres, y a Dory le llegaba la cancelación sin gastos, que no le sirve.
+// `clave` = clave dentro de vuelos.cal_usuarios · `campoDias` = columna de vuelos con los días antes de la
+// salida · `inputId` = el input del formulario (IDs históricos, se conservan).
+const CAL_EVENTOS=[
+  {clave:'pago_final',       titulo:'Pago final',            campoDias:'cal_dias_pago_final',        inputId:'v-cal-pago'},
+  {clave:'cancel_sin_gastos',titulo:'Cancelación sin gastos',campoDias:'cal_dias_cancel_sin_gastos', inputId:'v-cal-cancel-sin'},
+  {clave:'cancel_con_gastos',titulo:'Cancelación con gastos',campoDias:'cal_dias_cancel_con_gastos', inputId:'v-cal-cancel-con'}
+];
+// vuelos.cal_usuarios pasó de ser UNA lista de emails a un objeto {clave_evento: [emails]}.
+// Esta función acepta las dos formas: un array viejo significa "esta gente en los tres vencimientos",
+// que es exactamente lo que hacía el sistema hasta b84 → los cupos ya cargados no cambian de comportamiento.
+function calDestinatarios(raw){
+  const out={};CAL_EVENTOS.forEach(e=>{out[e.clave]=[];});
+  if(Array.isArray(raw)){CAL_EVENTOS.forEach(e=>{out[e.clave]=raw.filter(x=>typeof x==='string');});return out;}
+  if(raw&&typeof raw==='object'){CAL_EVENTOS.forEach(e=>{out[e.clave]=Array.isArray(raw[e.clave])?raw[e.clave].filter(x=>typeof x==='string'):[];});return out;}
+  return out;
+}
+// Unión de los tres: "¿este cupo tiene agenda?" y el attendees de compatibilidad del payload a n8n.
+const calTodosLosDestinatarios=d=>[...new Set(CAL_EVENTOS.flatMap(e=>d[e.clave]||[]))];
+// Lo que quedó marcado en la grilla del formulario, listo para guardar en cal_usuarios.
+function calDestinatariosDelForm(){
+  const out={};
+  CAL_EVENTOS.forEach(e=>{out[e.clave]=Array.from(document.querySelectorAll(`.v-cal-u[data-ev="${e.clave}"]:checked`)).map(c=>c.value);});
+  return out;
+}
+// Marcar/desmarcar una columna entera: si ya está toda marcada, la limpia.
+function toggleColumnaCal(clave){
+  const cbs=Array.from(document.querySelectorAll(`.v-cal-u[data-ev="${clave}"]`));
+  if(!cbs.length) return;
+  const todas=cbs.every(c=>c.checked);
+  cbs.forEach(c=>{c.checked=!todas;});
+}
 // Ola 3 #64/#70: secreto compartido con los workflows n8n — va en el BODY (fetch no-cors no deja pasar headers custom).
 const CUPOS_WEBHOOK_SECRET=CONFIG.WEBHOOK_SECRET;
 // #75: v.vuelo_id habilita el UPSERT en n8n (la base guarda los event IDs del cupo en vuelos.agenda_eventos;
@@ -802,24 +895,28 @@ async function agendarEventosCupo(v,opts){
     const esEdicion=!!(opts&&opts.edicion);
     if(!v) return;
     if(esEdicion&&!v.vuelo_id) return; // sin id no hay upsert posible
-    const users=Array.isArray(v.cal_usuarios)?v.cal_usuarios:[];
+    // b85: cada vencimiento lleva SU propia lista de destinatarios (ver CAL_EVENTOS / calDestinatarios).
+    const dest=calDestinatarios(v.cal_usuarios);
     const eventos=[];
-    if(v.fecha&&users.length){
+    if(v.fecha){
       const base=String(v.fecha).slice(0,10);
-      const evDefs=[['Pago final',v.cal_dias_pago_final],['Cancelación sin gastos',v.cal_dias_cancel_sin_gastos],['Cancelación con gastos',v.cal_dias_cancel_con_gastos]];
-      evDefs.forEach(([tipo,dias])=>{
+      CAL_EVENTOS.forEach(ev=>{
+        const dias=v[ev.campoDias];
         if(dias===null||dias===undefined||dias==='') return;
+        const attendees=dest[ev.clave]||[];
+        if(!attendees.length) return; // b85: vencimiento sin nadie marcado = no se agenda (la agenda sigue siendo opt-in)
         const d=new Date(base+'T00:00:00');
         d.setDate(d.getDate()-parseInt(dias));
         // Pedido aéreos (Rodrigo, 29-jun): la agenda solo de lunes a viernes. Si cae finde, mover al VIERNES anterior (un deadline no se corre hacia adelante). Sáb→−1, Dom→−2.
         const dow=d.getDay();
         if(dow===6) d.setDate(d.getDate()-1);
         else if(dow===0) d.setDate(d.getDate()-2);
-        eventos.push({tipo,fecha:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`});
+        eventos.push({tipo:ev.titulo,fecha:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`,attendees});
       });
     }
     if(!esEdicion&&!eventos.length) return; // crear: la calendarización es opt-in, sin eventos no hay nada que agendar
-    const payload={secret:CUPOS_WEBHOOK_SECRET,vuelo_id:v.vuelo_id||'',cupo:v.nombre||'',localizador:v.localizador||'',aerolinea:v.aerolinea||'',fecha_salida:v.fecha?String(v.fecha).slice(0,10):'',url:location.origin+location.pathname,attendees:users,eventos};
+    // attendees de nivel superior = la unión. El workflow lo usa como respaldo si un evento viene sin lista propia.
+    const payload={secret:CUPOS_WEBHOOK_SECRET,vuelo_id:v.vuelo_id||'',cupo:v.nombre||'',localizador:v.localizador||'',aerolinea:v.aerolinea||'',fecha_salida:v.fecha?String(v.fecha).slice(0,10):'',url:location.origin+location.pathname,attendees:calTodosLosDestinatarios(dest),eventos};
     await fetch(N8N_WEBHOOK_AGENDA,{method:'POST',mode:'no-cors',body:JSON.stringify(payload)});
   }catch(e){console.warn('[Agenda] no se pudo agendar:',e);}
 }
@@ -879,8 +976,27 @@ const CONDICIONES_ITINERARIO=CONFIG.CONDICIONES_ITINERARIO;
 const CONDICIONES_NOTA=CONFIG.CONDICIONES_NOTA;
 // Escape de HTML para todo dato de usuario interpolado en innerHTML/document.write (anti-XSS)
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-// Ola 4 #93: los invitados de la agenda salen de CONFIG, no del HTML (otra agencia no hereda estos nombres)
-{const _cw=document.getElementById('v-cal-users'); if(_cw) _cw.innerHTML=CONFIG.AGENDA_INVITADOS.map(u=>`<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" class="v-cal-user" value="${esc(u.email)}" style="width:14px;height:14px"/> ${esc(u.nombre)}</label>`).join('');}
+// Ola 4 #93: los invitados de la agenda salen de CONFIG, no del HTML (otra agencia no hereda estos nombres).
+// b85: una COLUMNA por vencimiento (días + destinatarios juntos) y una FILA por persona, para poder decidir
+// caso por caso quién recibe qué. El encabezado de cada columna marca/desmarca toda la columna.
+{const _cw=document.getElementById('v-cal-grid');
+ if(_cw) _cw.innerHTML=`<table style="border-collapse:collapse;font-size:12px;width:100%;min-width:420px">
+  <thead>
+    <tr>
+      <th style="text-align:left;padding:3px 6px;font-size:11px;color:var(--muted);font-weight:600">Vencimiento</th>
+      ${CAL_EVENTOS.map(e=>`<th style="padding:3px 6px;text-align:center;font-size:11px"><span onclick="toggleColumnaCal('${e.clave}')" title="Marcar o desmarcar toda la columna" style="cursor:pointer;border-bottom:1px dotted var(--muted)">${esc(e.titulo)}</span></th>`).join('')}
+    </tr>
+    <tr>
+      <td style="padding:3px 6px;font-size:11px;color:var(--muted)">Días antes de la salida</td>
+      ${CAL_EVENTOS.map(e=>`<td style="padding:3px 6px;text-align:center"><input class="form-input" id="${e.inputId}" type="number" min="0" placeholder="No aplica" style="width:96px;text-align:center;padding:5px 6px;margin:0 auto"/></td>`).join('')}
+    </tr>
+  </thead>
+  <tbody>
+    ${CONFIG.AGENDA_INVITADOS.map(u=>`<tr style="border-top:1px solid var(--border)">
+      <td style="padding:4px 6px">${esc(u.nombre)}</td>
+      ${CAL_EVENTOS.map(e=>`<td style="padding:4px 6px;text-align:center"><input type="checkbox" class="v-cal-u" data-ev="${e.clave}" value="${esc(u.email)}" title="${esc(u.nombre)} — ${esc(e.titulo)}" style="width:15px;height:15px;cursor:pointer"/></td>`).join('')}
+    </tr>`).join('')}
+  </tbody></table>`;}
 // Ola 4 #94: sin Atlas no se muestra el conector (el botón dinámico del detalle se gatea en cargarDetalle)
 if(!CONFIG.ATLAS_ENABLED){const _ba=document.getElementById('p-traer-atlas'); if(_ba) _ba.style.display='none';}
 let currentUser=null,currentRol=null,currentVueloId=null,currentPasajeroId=null,currentLugarId=null,currentVueloFecha=null,currentVueloFechaRegreso=null,sesionIniciada=false,rolEfectivo=null,_pOrig=null;
@@ -888,6 +1004,10 @@ let temporadas=[],temporadaActiva=null,vuelosData=[],tramosCount=0,dashFiltro='t
 let reservarVueloId=null,reservarLugaresLibres=0,reservarLugaresIds=[];
 let cancelarLugarId=null,cancelarPasajeroId=null,cancelarVueloId=null;
 let editarVueloId=null,vendedores=[],guardandoVuelo=false,nombreCupoManual=false,_regresoPrevio=null;
+// Acciones comerciales (b82): catálogo de etiquetas que el admin le pone a lugares sueltos
+// (preventa, Black Friday…). Lo lee cualquier usuario: el vendedor tiene que ver el color.
+let accionesComerciales=[];
+const accionDeLugar=l=>(l&&l.accion_id)?(accionesComerciales.find(a=>a.id===l.accion_id)||null):null;
 
 async function loginGoogle(){await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:CONFIG.APP_URL,queryParams:{hd:CONFIG.OAUTH_DOMINIO}}})}
 async function cerrarSesion(){try{await sb.auth.signOut({scope:'local'});}catch(e){console.warn('signOut:',e);}window.location.reload()}
@@ -981,6 +1101,11 @@ async function iniciarSesion(session){
   const {data:vends,error:ve}=await sb.from('usuarios').select('nombre,email,rol,activo').order('nombre');
   console.log('vendedores cargados:',vends?.length,ve);
   vendedores=vends||[];
+  // Catálogo de acciones comerciales (b82). Si falla no se rompe nada: los lugares se ven sin etiqueta.
+  try{
+    const {data:accs}=await sb.from('acciones_comerciales').select('id,nombre,color,activa').order('nombre');
+    accionesComerciales=accs||[];
+  }catch(e){console.warn('[acciones comerciales]',e);accionesComerciales=[];}
   // Delegación: titulares que este usuario asiste (puede operar sus fichas como propias)
   misAsistidas=[];
   try{
@@ -1677,6 +1802,7 @@ async function cargarDetalle(vueloId){
         <button class="menu-item" onclick="this.closest('details').removeAttribute('open');marcarEmitido('${vueloId}',${vuelo.emitido?'false':'true'})">${vuelo.emitido?'🔓 Sacar la marca de EMITIDO':'🎫 Marcar como EMITIDO (congela el cupo)'}</button>
         <button class="menu-item" onclick="this.closest('details').removeAttribute('open');imprimirItinerario('${vueloId}')">🖨 Imprimir / PDF</button>
         <button class="menu-item" onclick="this.closest('details').removeAttribute('open');abrirModalReducir('${vueloId}')">▾ Reducir plazas</button>
+        <button class="menu-item" onclick="this.closest('details').removeAttribute('open');abrirModalAccionesCupo('${vueloId}')">🏷 Acciones comerciales</button>
         <div class="menu-divider"></div>
         <div class="menu-label">Peligro</div>
         <button class="menu-item danger" onclick="this.closest('details').removeAttribute('open');abrirModalCancelar('${vueloId}')">⚠ Cancelar reserva (con penalidad)…</button>
@@ -1704,6 +1830,32 @@ async function cargarDetalle(vueloId){
     ${lugaresReducidos.length>0?`<div class="info-item"><div class="info-item-label">Reducidos</div><div class="info-item-value" style="font-size:14px;color:var(--muted)">${lugaresReducidos.length}</div></div>`:''}
     ${vuelo.condiciones_equipaje?`<div class="info-item"><div class="info-item-label">Equipaje</div><div class="info-item-value" style="font-size:14px">${esc(vuelo.condiciones_equipaje)}</div></div>`:''}
   </div>`;
+
+  // Leyenda de acciones comerciales del cupo (b82). El nombre de la acción se dice UNA vez acá,
+  // no en cada fila: en la planilla el lugar se reconoce por la barra de color de la izquierda.
+  // De paso da el "control de lo vendido" a nivel cupo, sin ir hasta Administración.
+  {
+    const porAccion={};
+    lugaresActivos.forEach(l=>{
+      if(!l.accion_id)return;
+      const a=accionDeLugar(l);if(!a)return;
+      const g=porAccion[a.id]||(porAccion[a.id]={acc:a,total:0,v:0,r:0,libres:0});
+      const pp=l.pasajeros?.[0];
+      g.total++;
+      if(pp&&!pp.cancelado&&pp.status==='V')g.v++;
+      else if(pp&&!pp.cancelado&&pp.status==='R')g.r++;
+      else g.libres++;
+    });
+    const grupos=Object.values(porAccion);
+    if(grupos.length){
+      html+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">${grupos.map(g=>
+        `<div style="display:flex;align-items:center;gap:8px;border:1px solid ${esc(g.acc.color)}55;background:${esc(g.acc.color)}14;border-radius:8px;padding:6px 12px;font-size:12px">
+          <span style="width:10px;height:10px;border-radius:2px;background:${esc(g.acc.color)};flex:none"></span>
+          <b style="color:${esc(g.acc.color)}">${esc(g.acc.nombre)}</b>
+          <span style="color:var(--muted)">${g.total} lugar${g.total===1?'':'es'} · ${g.v} vendido${g.v===1?'':'s'} · ${g.r} reservado${g.r===1?'':'s'} · ${g.libres} libre${g.libres===1?'':'s'}</span>
+        </div>`).join('')}</div>`;
+    }
+  }
 
   html+=`<details style="margin-bottom:16px"><summary style="cursor:pointer;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;padding:4px 0">ⓘ ¿Qué significan los colores y estados?</summary>
     <div style="display:flex;flex-wrap:wrap;gap:8px 16px;padding:8px 0;font-size:12px;color:var(--muted)">
@@ -1754,6 +1906,16 @@ async function cargarDetalle(vueloId){
     const tpEmail=p?.travel_partner_email||'';
     const tpNom=tpEmail?((vendedores.find(v=>String(v.email||'').toLowerCase()===tpEmail.toLowerCase())||{}).nombre||tpEmail):'';
     const tpTag=tpNom?` <span class="badge" title="Ficha abierta para el Travel Partner: ${esc(tpNom)}" style="background:rgba(124,111,253,0.18);color:var(--accent2);border:1px solid rgba(124,111,253,0.35)">TP: ${esc(tpNom)}</span>`:'';
+    // Acción comercial (b82): el lugar está reservado para una acción (preventa, Black Friday…).
+    // NO lo bloquea: el vendedor lo reserva normal. Es una marca visual, con el color de la acción.
+    // El nombre de la acción NO va en la fila: la columna es angosta, el texto se parte en varias
+    // líneas y la fila se vuelve altísima. Va la barra de color + el título al pasar el mouse,
+    // y el nombre se dice UNA vez en la leyenda de arriba del cupo.
+    // Barra lateral gruesa + fondo tenue del color de la acción. El fondo se pinta SOLO si el lugar
+    // está libre: si ya tiene reserva o venta, manda el color de estado (esa información pesa más)
+    // y la acción se sigue reconociendo por la barra.
+    const acc=accionDeLugar(l);
+    const accStyle=acc?` style="box-shadow:inset 7px 0 0 ${esc(acc.color)}${libreSeat&&!cancelado?`;background:${esc(acc.color)}1f`:''}" title="Acción comercial: ${esc(acc.nombre)} — se puede reservar normalmente"`:'';
     let rowCls,statusCell;
     if(modo==='reducido'){rowCls='row-cancelado';statusCell='<span class="badge badge-l">REDUCIDO</span>';}
     else if(cancelado){rowCls='row-cancelado';statusCell='<span class="badge badge-yellow">CANCEL</span>';}
@@ -1772,8 +1934,8 @@ async function cargarDetalle(vueloId){
     // Ola 3: admin/operaciones (des)bloquean un lugar para Operaciones (solo lugares activos libres)
     const btnBloqueo=((esAdmin||esOper)&&modo==='activo'&&libreSeat&&!l.reducido)?`<button class="btn-sm btn-sm-oper" title="${l.bloqueado_operaciones?'Liberar este lugar para que lo puedan reservar los vendedores':'Reservar este lugar para Operaciones (los vendedores no lo pueden tomar)'}" onclick="toggleBloqueoOper('${l.id}','${vuelo.id}',${l.bloqueado_operaciones?'false':'true'})">${l.bloqueado_operaciones?'🔓 Desbloquear':'🔒 Bloquear Oper'}</button>`:'';
     const accionCell=[(accion&&accion!=='—')?accion:'',btnPdf,btnBloqueo].filter(Boolean).join(' ')||accion;
-    let h=`<tr class="${rowCls}">
-      <td style="font-family:'DM Mono',monospace;font-weight:500"${numVisible!=null&&numVisible!==l.numero_lugar?` title="Lugar interno ${l.numero_lugar} — es el que figura en el historial de actividad"`:''}>${numVisible!=null?numVisible:l.numero_lugar}</td>
+    let h=`<tr class="${rowCls}"${accStyle}>
+      <td style="font-family:'DM Mono',monospace;font-weight:500"${numVisible!=null&&numVisible!==l.numero_lugar?` title="Lugar interno ${l.numero_lugar} — es el que figura en el historial de actividad"`:''}>${acc?`<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${esc(acc.color)};margin-right:6px;vertical-align:middle" title="${esc(acc.nombre)}"></span>`:''}${numVisible!=null?numVisible:l.numero_lugar}</td>
       <td>${esc(p?.primer_apellido)||'—'}</td>
       <td>${esc(p?.segundo_apellido)||'—'}</td>
       <td>${esc(p?.primer_nombre)||'—'}</td>
@@ -2510,6 +2672,139 @@ async function confirmarReduccion(){
   mostrarAlerta('modal-red-alert',`${hechos} plaza${hechos>1?'s':''} reducida${hechos>1?'s':''}`+(hechos<n?` (de ${n} pedidas; el resto ya no estaba libre)`:''),'success');
   setTimeout(()=>{cerrarModal('modal-reducir');cargarDetalle(reducirVueloId)},1000);
 }
+// ---------- Acciones comerciales: administración del catálogo (b82, solo admin) ----------
+// El resumen (lugares / libres / reservados / vendidos) es el "control de lo vendido" que pidió
+// Operaciones: sirve para ver cómo viene cada acción sin tener que abrir cupo por cupo.
+async function cargarAccionesAdmin(){
+  const el=document.getElementById('admin-acciones');if(!el)return;
+  await asegurarTokenFresco();
+  const res=await conReintentoAuth(()=>sb.rpc('admin_resumen_acciones'),'RPC admin_resumen_acciones');
+  if(res?.error){el.innerHTML='<div style="font-size:13px;color:var(--muted)">No se pudo cargar el resumen.</div>';return;}
+  const filas=res?.data||[];
+  accionesComerciales=filas.map(f=>({id:f.accion_id,nombre:f.nombre,color:f.color,activa:f.activa}));
+  if(!filas.length){el.innerHTML='<div style="font-size:13px;color:var(--muted)">Todavía no hay acciones creadas.</div>';return;}
+  el.innerHTML=filas.map(f=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)${f.activa?'':';opacity:.55'}">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="width:12px;height:12px;border-radius:3px;background:${esc(f.color)};flex:none"></span>
+      <div style="font-size:13px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.nombre)}</div>
+      ${f.activa?'':'<span class="badge badge-l">Inactiva</span>'}
+      <button class="btn-sm" onclick="abrirModalAccion('${f.accion_id}')">Editar</button>
+      <button class="btn-sm btn-sm-toggle" onclick="eliminarAccion('${f.accion_id}','${esc(f.nombre)}',${f.lugares})">${f.lugares>0?'Desactivar':'Borrar'}</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:3px;padding-left:20px">
+      ${f.lugares} lugar${f.lugares===1?'':'es'} · <span style="color:var(--green)">${f.vendidos} vendido${f.vendidos===1?'':'s'}</span> · ${f.reservados} reservado${f.reservados===1?'':'s'} · ${f.libres} libre${f.libres===1?'':'s'}
+    </div>
+  </div>`).join('');
+}
+let accionEditId=null;
+function abrirModalAccion(id){
+  accionEditId=id||null;
+  const a=id?(accionesComerciales.find(x=>x.id===id)||{}):{};
+  document.getElementById('acc-nombre').value=a.nombre||'';
+  document.getElementById('acc-color').value=a.color||'#7c6ffd';
+  document.getElementById('acc-activa').checked=a.activa!==false;
+  document.getElementById('modal-accion-titulo').textContent=id?'Editar acción comercial':'Nueva acción comercial';
+  document.getElementById('modal-accion-alert').innerHTML='';
+  document.getElementById('modal-accion').style.display='flex';
+}
+async function guardarAccion(){
+  const nombre=document.getElementById('acc-nombre').value.trim();
+  if(!nombre){mostrarAlerta('modal-accion-alert','Poné un nombre','error');return;}
+  const color=document.getElementById('acc-color').value;
+  const activa=document.getElementById('acc-activa').checked;
+  setBtnLoading('btn-guardar-accion',true,'Guardar');
+  await asegurarTokenFresco();
+  const res=await conReintentoAuth(()=>sb.rpc('admin_guardar_accion',{p_id:accionEditId,p_nombre:nombre,p_color:color,p_activa:activa}),'RPC admin_guardar_accion');
+  setBtnLoading('btn-guardar-accion',false,'Guardar');
+  if(res?.error){
+    const dup=/acciones_comerciales_nombre_uniq|duplicate key/i.test(res.error.message||'');
+    mostrarAlerta('modal-accion-alert',dup?'Ya existe una acción con ese nombre':'Error: '+res.error.message,'error');
+    return;
+  }
+  cerrarModal('modal-accion');
+  cargarAccionesAdmin();
+}
+async function eliminarAccion(id,nombre,lugares){
+  const msg=lugares>0
+    ? `"${nombre}" tiene ${lugares} lugar(es) marcados, así que no se borra: se DESACTIVA (deja de ofrecerse, pero se conserva el rastro de lo que ya se vendió). ¿Continuar?`
+    : `¿Borrar la acción "${nombre}"?`;
+  if(!confirm(msg))return;
+  await asegurarTokenFresco();
+  const res=await conReintentoAuth(()=>sb.rpc('admin_eliminar_accion',{p_id:id}),'RPC admin_eliminar_accion');
+  if(res?.error){alert('Error: '+res.error.message);return;}
+  cargarAccionesAdmin();
+}
+
+// ---------- Acciones comerciales (b82) ----------
+// El admin marca lugares de un cupo con una etiqueta de acción (preventa, Black Friday…).
+// Los lugares NO se bloquean: es una marca visual que sobrevive a la reserva y a la venta.
+let accionesVueloId=null;
+async function abrirModalAccionesCupo(vueloId){
+  accionesVueloId=vueloId;
+  await asegurarTokenFresco();
+  // Refresco el catálogo por si el admin creó una acción nueva en otra pestaña
+  const {data:accs}=await sb.from('acciones_comerciales').select('id,nombre,color,activa').order('nombre');
+  accionesComerciales=accs||[];
+  const activas=accionesComerciales.filter(a=>a.activa);
+  const sel=document.getElementById('acc-selector');
+  sel.innerHTML=activas.length
+    ? activas.map(a=>`<option value="${a.id}">${esc(a.nombre)}</option>`).join('')
+    : '<option value="">— No hay acciones creadas —</option>';
+  document.getElementById('btn-aplicar-accion').disabled=!activas.length;
+
+  const {data:lugs}=await sb.from('lugares')
+    .select('id,numero_lugar,es_espera,reducido,accion_id,pasajeros(status,cancelado,primer_apellido,primer_nombre)')
+    .eq('vuelo_id',vueloId).eq('es_infant',false).order('numero_lugar');
+  // Mismo criterio que la RPC: espera y reducidos no participan de acciones comerciales
+  const elegibles=(lugs||[]).filter(l=>!l.es_espera&&!l.reducido);
+  document.getElementById('acc-lugares').innerHTML = elegibles.length ? elegibles.map(l=>{
+    const p=l.pasajeros?.[0];
+    const st=p?.cancelado?'CANCEL':(p?.status||'L');
+    const quien=(p&&st!=='L'&&!p.cancelado)?` — ${esc(p.primer_apellido||'')} ${esc(p.primer_nombre||'')}`.trimEnd():'';
+    const acc=accionDeLugar(l);
+    const marca=acc?` <span class="badge" style="background:${esc(acc.color)}22;color:${esc(acc.color)};border:1px solid ${esc(acc.color)}66">🏷 ${esc(acc.nombre)}</span>`:'';
+    const estado=st==='L'?'<span style="color:var(--muted)">libre</span>':`<b>${st}</b>${quien}`;
+    return `<label style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid var(--border);cursor:pointer">
+      <input type="checkbox" class="acc-chk" value="${l.id}" ${acc?'checked':''} onchange="accActualizarContador()"/>
+      <span style="font-family:'DM Mono',monospace;min-width:28px">${l.numero_lugar}</span>
+      <span style="flex:1;font-size:13px">${estado}</span>${marca}
+    </label>`;
+  }).join('') : '<div style="color:var(--muted);font-size:13px;padding:6px">Este cupo no tiene lugares elegibles.</div>';
+
+  document.getElementById('modal-acc-alert').innerHTML='';
+  accActualizarContador();
+  document.getElementById('modal-acciones-cupo').style.display='flex';
+}
+function accActualizarContador(){
+  const n=document.querySelectorAll('.acc-chk:checked').length;
+  const tot=document.querySelectorAll('.acc-chk').length;
+  document.getElementById('acc-contador').textContent=`(${n} de ${tot} marcados)`;
+}
+function accMarcarTodos(v){
+  document.querySelectorAll('.acc-chk').forEach(c=>{c.checked=v});
+  accActualizarContador();
+}
+async function aplicarAccionLugares(quitar){
+  const ids=[...document.querySelectorAll('.acc-chk:checked')].map(c=>c.value);
+  if(!ids.length){mostrarAlerta('modal-acc-alert','Marcá al menos un lugar','error');return;}
+  const accId=document.getElementById('acc-selector').value;
+  if(!quitar&&!accId){mostrarAlerta('modal-acc-alert','Primero creá una acción comercial desde Administración','error');return;}
+  const nombreAcc=(accionesComerciales.find(a=>a.id===accId)||{}).nombre||'';
+  if(!confirm(quitar
+      ? `¿Quitarle la etiqueta a ${ids.length} lugar(es)?`
+      : `¿Marcar ${ids.length} lugar(es) como "${nombreAcc}"? No se bloquean: el vendedor los va a poder reservar igual.`)) return;
+  const btn=quitar?'btn-quitar-accion':'btn-aplicar-accion';
+  const txt=quitar?'Quitar la etiqueta':'Aplicar acción';
+  setBtnLoading(btn,true,txt);
+  await asegurarTokenFresco();
+  const res=await conReintentoAuth(()=>sb.rpc('set_accion_lugares',{p_lugar_ids:ids,p_accion_id:quitar?null:accId}),'RPC set_accion_lugares');
+  setBtnLoading(btn,false,txt);
+  if(res?.error){mostrarAlerta('modal-acc-alert','Error: '+res.error.message,'error');return;}
+  const n=res?.data||0;
+  mostrarAlerta('modal-acc-alert',quitar?`Etiqueta quitada de ${n} lugar(es)`:`${n} lugar(es) marcados como "${nombreAcc}"`,'success');
+  setTimeout(()=>{cerrarModal('modal-acciones-cupo');cargarDetalle(accionesVueloId)},900);
+}
+
 let cancelarCupoVueloId=null;
 function cancelarCupo(vueloId){
   cancelarCupoVueloId=vueloId;
@@ -2802,6 +3097,7 @@ async function cargarAdmin(){
     sb.from('usuarios').select('email,nombre,rol,activo').order('nombre')
   ]);
   cargarLog(true);
+  cargarAccionesAdmin();
   temporadas=temps||[];
   document.getElementById('admin-temporadas').innerHTML=temporadas.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px"><div style="font-size:13px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.nombre)}</div><span class="badge ${t.activa?'badge-green':'badge-l'}">${t.activa?'Activa':'Inactiva'}</span><button class="btn-sm" onclick="abrirEditarTemporada('${t.id}')">Editar</button><button class="btn-sm btn-sm-toggle" onclick="toggleActivaTemporada('${t.id}',${!!t.activa})">${t.activa?'Desactivar':'Activar'}</button></div>`).join('');
   // Cupos agrupados POR TEMPORADA (b76): secciones plegables en vez de una lista plana. Temporadas activas
@@ -3214,7 +3510,7 @@ async function abrirEditarVuelo(vueloId,opts){
       document.getElementById('v-cal-pago').value=v.cal_dias_pago_final??'';
       document.getElementById('v-cal-cancel-sin').value=v.cal_dias_cancel_sin_gastos??'';
       document.getElementById('v-cal-cancel-con').value=v.cal_dias_cancel_con_gastos??'';
-      {const us=Array.isArray(v.cal_usuarios)?v.cal_usuarios:[];document.querySelectorAll('.v-cal-user').forEach(c=>{c.checked=us.includes(c.value);});}
+      {const dest=calDestinatarios(v.cal_usuarios);document.querySelectorAll('.v-cal-u').forEach(c=>{c.checked=(dest[c.dataset.ev]||[]).includes(c.value);});}
       document.getElementById('v-visible').value=(v.visible===false)?'false':'true';
       document.getElementById('v-equipaje').value=v.condiciones_equipaje||'';
       document.getElementById('tramos-wrap').innerHTML='';
@@ -3277,7 +3573,7 @@ async function abrirModalVuelo(){
   {const av=document.getElementById('v-localizador-aviso');if(av){av.style.display='none';av.textContent='';}}  // el aviso de PNR repetido no se arrastra de un cupo al siguiente
   {const hintLug=document.getElementById('v-lugares-hint');if(hintLug)hintLug.style.display='none';}
   ['v-cal-pago','v-cal-cancel-sin','v-cal-cancel-con'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
-  document.querySelectorAll('.v-cal-user').forEach(c=>{c.checked=false;});
+  document.querySelectorAll('.v-cal-u').forEach(c=>{c.checked=false;});
   document.getElementById('v-visible').value='true';
   nombreCupoManual=false;_regresoPrevio=null;
   document.getElementById('tramos-wrap').innerHTML='';
@@ -3324,7 +3620,7 @@ async function guardarVuelo(){
       cal_dias_pago_final:numCalDias('v-cal-pago'),
       cal_dias_cancel_sin_gastos:numCalDias('v-cal-cancel-sin'),
       cal_dias_cancel_con_gastos:numCalDias('v-cal-cancel-con'),
-      cal_usuarios:Array.from(document.querySelectorAll('.v-cal-user:checked')).map(c=>c.value)
+      cal_usuarios:calDestinatariosDelForm()  // b85: objeto {clave_evento:[emails]}, ya no una sola lista
     };
     // Validaciones de carga (aplican a crear / duplicar / editar). Se corren con el itinerario ya validado.
     const btnTxt=editarVueloId?'Guardar cambios':'Crear cupo';
@@ -3398,9 +3694,10 @@ async function guardarVuelo(){
       //    cambia por la hora) → re-agendar sería innecesario y spamearía a los invitados (cancela los eventos
       //    viejos + reinvita). Por eso solo dispara si cambió lo que MUEVE los vencimientos (fecha de salida,
       //    días de pago/cancelación) o los INVITADOS — y aun así, con confirmación explícita.
-      const canonCal=x=>JSON.stringify([String(x.fecha||'').slice(0,10),x.cal_dias_pago_final??null,x.cal_dias_cancel_sin_gastos??null,x.cal_dias_cancel_con_gastos??null,(Array.isArray(x.cal_usuarios)?x.cal_usuarios:[]).slice().sort()]);
-      const teniaAgenda=Array.isArray(vAct?.cal_usuarios)&&vAct.cal_usuarios.length>0;
-      const tieneAgenda=datos.cal_usuarios.length>0;
+      //    b85: los destinatarios se comparan POR VENCIMIENTO — sacar a alguien de un solo evento también reagenda.
+      const canonCal=x=>{const d=calDestinatarios(x.cal_usuarios);return JSON.stringify([String(x.fecha||'').slice(0,10),x.cal_dias_pago_final??null,x.cal_dias_cancel_sin_gastos??null,x.cal_dias_cancel_con_gastos??null,CAL_EVENTOS.map(e=>d[e.clave].slice().sort())]);};
+      const teniaAgenda=calTodosLosDestinatarios(calDestinatarios(vAct?.cal_usuarios)).length>0;
+      const tieneAgenda=calTodosLosDestinatarios(calDestinatarios(datos.cal_usuarios)).length>0;
       if(vAct&&canonCal(vAct)!==canonCal(datos)&&(teniaAgenda||tieneAgenda)){
         const msg=tieneAgenda
           ?'Cambiaste la fecha de salida, los días de pago/cancelación o los invitados de un cupo con agenda.\n\n¿Reagendar los recordatorios de pago y cancelación en Google Calendar?\n\n• Los invitados recibirán la cancelación de los eventos viejos y la invitación a los nuevos.\n• Si solo cambió el HORARIO del vuelo (mismas fechas de pago), NO hace falta: el aviso al equipo ya lo maneja el mail de cambio de itinerario.'
