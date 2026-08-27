@@ -870,7 +870,7 @@ const sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY,{
 // ⚠️ Una sola versión por cadena y CORTA: el detalle va al CHANGELOG.md, no acá. Nacho ve este texto
 // completo en el encabezado (el resto ve solo el "bNN") y si es largo se desborda; además `APP_VERSION_CORTA`
 // saca el número con un match, así que dos "bNN" en la misma cadena confunden cuál es la versión.
-const APP_VERSION='Fase 2 · 2026-08-27 (b91 · el voucher muestra el LOGO de la aerolínea arriba del nombre, como lo pidió Mikaela. Van los logos oficiales en vector (SKY, Azul y GOL), así no se pixelan a ningún tamaño. Si mañana se suma una aerolínea sin logo cargado, muestra solo el nombre y no queda una imagen rota. b90 · VOUCHER DE VUELO POR PASAJERO: en los cupos de SKY, Azul y GOL aparece un botón "Voucher" en cada venta, que arma el ticket manual de Guamatur para ese pasajero: la tabla de vuelos, el pasajero con su infant, el equipaje del cupo y las leyendas legales que pasó Operaciones. No lleva alojamiento, ni ficha, ni vendedor, ni precio. Lo ven SOLO Operaciones y administradores, no el vendedor. Pedido de Mikaela Minetti. b89 · AGENDA: al crear un cupo nuevo la grilla de recordatorios ya viene marcada con lo que pidió cada uno por mail: pago final a Dory y a Producto Aéreo, las dos cancelaciones a Mariana y a Producto Aéreo, y Diego los tres hasta que diga otra cosa. Antes nacía vacía y cada uno tildaba lo que se acordaba, así que dos cupos cargados el mismo día avisaban a gente distinta. Se sigue pudiendo desmarcar a mano en cada cupo: es el punto de partida, no un candado. b88 · PREVENTA: los lugares marcados con una acción comercial ahora vencen en 48 horas en vez de 72 (en un cupo crítico siguen siendo 24: manda el plazo más corto). En el listado de cupos aparece una pastilla con el color y el nombre de la acción y cuántos lugares quedan libres, así se ve desde afuera dónde hay preventa para vender. Y si una reserva se lleva lugares de la acción JUNTO CON lugares comunes, salta un aviso al vendedor —los precios pueden ser distintos, que lo consulte con su supervisor— y se le avisa a Operaciones por mail. Los lugares se toman igual: no se bloquea nada. Pedido de Nacho. b88: la pastilla va con el color lleno para que no se confunda con el nombre del cupo)';
+const APP_VERSION='Fase 2 · 2026-08-27 (b92 · arreglo: la descripción de la versión se desbordaba sobre el listado de cupos y lo tapaba. Ese texto lo ve solo Nacho, y se había ido agrandando versión a versión. Ahora en pantalla va solo el número y el detalle aparece al pasar el mouse por encima. Lo último que entró: b90/b91, el voucher de vuelo por pasajero para los cupos de SKY, Azul y GOL, con el logo de la aerolínea, que sacan Operaciones y los administradores desde cada venta.)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 // ⚠️ Toda columna que se agregue acá necesita `grant select (col) to authenticated` en la base, si no
 // PostgREST tira 400 y se cae la pantalla entera (gotcha #6). `emitido` viene de la migración 2026-08-06.
@@ -981,7 +981,14 @@ async function avisarCambioCupo(v,itiViejo,itiNuevo,cambios){
 const APP_VERSION_CORTA=(APP_VERSION.match(/b\d+(?:-[A-Za-z]+)?/)||['—'])[0];
 function mostrarVersionApp(){
   const esNacho=!!(currentUser&&String(currentUser.email||'').toLowerCase()==='ignacio.braida@guamatur.com');
-  document.querySelectorAll('.app-version').forEach(e=>{e.textContent=esNacho?APP_VERSION:APP_VERSION_CORTA;});
+  // b92: la descripción larga va en el TOOLTIP, no en el texto. Antes se escribía entera en el
+  // encabezado y, cuando creció, se desbordó por encima del listado de cupos y lo tapó (le pasó a Nacho
+  // con b91). Ahora en pantalla va siempre el "bNN" y el detalle aparece al pasar el mouse: no hay
+  // largo de texto que pueda romper la pantalla.
+  document.querySelectorAll('.app-version').forEach(e=>{
+    e.textContent=APP_VERSION_CORTA;
+    if(esNacho)e.title=APP_VERSION;
+  });
 }
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION_CORTA;});
 {const _cr=document.getElementById('login-copyright'); if(_cr) _cr.textContent=CONFIG.COPYRIGHT+' '+new Date().getFullYear();}
