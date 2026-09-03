@@ -880,7 +880,7 @@ const sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY,{
 // ⚠️ Una sola versión por cadena y CORTA: el detalle va al CHANGELOG.md, no acá. Nacho ve este texto
 // completo en el encabezado (el resto ve solo el "bNN") y si es largo se desborda; además `APP_VERSION_CORTA`
 // saca el número con un match, así que dos "bNN" en la misma cadena confunden cuál es la versión.
-const APP_VERSION='Fase 2 · 2026-09-02 (b98 · cuarto evento de la agenda de Calendar: "SALE EN 2 SEMANAS", para Pilar, Fernanda, Belén Macarin y Mikaela. Nace prendido con 14 días en los cupos de SKY, Azul, GOL y JetSmart, y se puede cambiar por cupo. Va junto con b97, la columna "Voucher enviado". Pedidos de Mikaela Minetti.)';
+const APP_VERSION='Fase 2 · 2026-09-03 (b99 · la casilla "Voucher enviado" ya funciona en un cupo EMITIDO — que son justo los que están por salir y tienen vouchers para mandar. El candado de emitido sigue frenando todo lo demás. Lo reportó Mikaela probándolo sobre Recife 06SEP.)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 // ⚠️ Toda columna que se agregue acá necesita `grant select (col) to authenticated` en la base, si no
 // PostgREST tira 400 y se cae la pantalla entera (gotcha #6). `emitido` viene de la migración 2026-08-06.
@@ -2854,7 +2854,10 @@ async function marcarVoucherEnviado(lugarId,vueloId,enviado,el){
   if(el)el.disabled=false;
   if(error){
     if(el)el.checked=!enviado;
-    alert('No se pudo marcar el voucher: '+error.message);
+    // b99: el alert() congela el repintado, así que sin el setTimeout la casilla se ve
+    // TILDADA detrás del cartel de error — como si hubiera quedado marcada. Lo vio Mikaela
+    // el 3-sep en la captura del cupo emitido. Primero repinta, después avisa.
+    setTimeout(()=>alert('No se pudo marcar el voucher: '+error.message),0);
     return;
   }
   const nota=document.querySelector(`[data-vch="${lugarId}"]`);
