@@ -970,7 +970,7 @@ const sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY,{
 // ⚠️ Una sola versión por cadena y CORTA: el detalle va al CHANGELOG.md, no acá. Nacho ve este texto
 // completo en el encabezado (el resto ve solo el "bNN") y si es largo se desborda; además `APP_VERSION_CORTA`
 // saca el número con un match, así que dos "bNN" en la misma cadena confunden cuál es la versión.
-const APP_VERSION='Fase 2 · 2026-09-23 (b110 · Un paquete es el PDF de Atlas: se sacó el campo de link del alta, que venía de cuando un paquete era un link a la web.)';
+const APP_VERSION='Fase 2 · 2026-09-23 (b111 · La pieza no imprime una flecha suelta cuando el PDF no trae los códigos de aeropuerto. Sale junto con el encendido de la IA.)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 // ⚠️ Toda columna que se agregue acá necesita `grant select (col) to authenticated` en la base, si no
 // PostgREST tira 400 y se cae la pantalla entera (gotcha #6). `emitido` viene de la migración 2026-08-06.
@@ -4729,7 +4729,7 @@ function paqueteHTML(p,firma){
   const filaVuelo=v=>`<div class="vseg"><div class="vseg-al">${F((v.aerolinea||'').slice(0,2).toUpperCase())}</div>
       <div class="vseg-main"><span class="rot">${F(v.tipo||'Ida')}${v.numero?' · vuelo '+F(v.numero):''}</span>
         <div class="ruta">${F(v.origen||v.origen_cod)} <span class="ar">→</span> ${F(v.destino||v.destino_cod)}</div>
-        <div class="vmeta">${[F(v.aerolinea),v.fecha?F(formatFecha(v.fecha)):'',`${F(v.origen_cod)} → ${F(v.destino_cod)}`].filter(Boolean).join(' · ')}</div></div>
+        <div class="vmeta">${[F(v.aerolinea),v.fecha?F(formatFecha(v.fecha)):'',(v.origen_cod&&v.destino_cod)?`${F(v.origen_cod)} → ${F(v.destino_cod)}`:''].filter(Boolean).join(' · ')}</div></div>
       <div class="hs">${F(v.salida)||'--:--'}<span class="dash">–</span>${F(v.llegada)||'--:--'}</div></div>`;
   const filaHotel=(h,i)=>`<div class="opcion"><div class="ophead"><span class="opn">Opción ${i+1}</span>
       <span class="opn" style="color:#6b7079">${h.noches||d.noches||''} noches${h.regimen?' · '+F(h.regimen):''}</span></div>
