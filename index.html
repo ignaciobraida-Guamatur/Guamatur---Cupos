@@ -943,6 +943,13 @@ const CONFIG={
     'La presentación en los aeropuertos debe ser de 3 horas antes de cada salida de vuelo.'
   ],
   ATLAS_ENABLED:true,
+  // b112 — condiciones que van SIEMPRE en la pieza del paquete, las traiga o no el PDF de Atlas.
+  // 🔑 Un cupo es un lugar PRE-COMPRADO: esto es verdad para todos, y dejarlo librado a que la IA lo
+  //    encuentre en el PDF significa que a algún pasajero no le va a llegar. Es condición comercial,
+  //    no un dato del documento. Si el texto ya vino en el PDF, no se repite.
+  PAQUETE_CONDICIONES_FIJAS:[
+    'Importante: Los pasajes aéreos emitidos en este período de alta demanda no son reembolsables y no admiten cambios de fecha ni están sujetos a penalidades por modificación. Recomendamos contratar un seguro de cancelación para contar con mayor flexibilidad ante imprevistos. Consultanos para más información.'
+  ],
   // b109 — el botón "Procesar con IA" de los paquetes. En false NO se dibuja: mejor que Operaciones
   // no vea el botón a que lo vea y falle siempre. Se prende cuando la ANTHROPIC_API_KEY está cargada
   // como secreto del proyecto de Supabase (y después de correr los 6 PDFs del set de prueba).
@@ -970,7 +977,7 @@ const sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY,{
 // ⚠️ Una sola versión por cadena y CORTA: el detalle va al CHANGELOG.md, no acá. Nacho ve este texto
 // completo en el encabezado (el resto ve solo el "bNN") y si es largo se desborda; además `APP_VERSION_CORTA`
 // saca el número con un match, así que dos "bNN" en la misma cadena confunden cuál es la versión.
-const APP_VERSION='Fase 2 · 2026-09-23 (b111 · La pieza no imprime una flecha suelta cuando el PDF no trae los códigos de aeropuerto. Sale junto con el encendido de la IA.)';
+const APP_VERSION='Fase 2 · 2026-09-23 (b112 · La pieza lleva el logo oficial de la aerolínea en vez de un código inventado, y la condición de los pasajes no reembolsables sale siempre. Va junto con el encendido de la IA.)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 // ⚠️ Toda columna que se agregue acá necesita `grant select (col) to authenticated` en la base, si no
 // PostgREST tira 400 y se cae la pantalla entera (gotcha #6). `emitido` viene de la migración 2026-08-06.
@@ -4722,11 +4729,37 @@ function paqOcupaciones(h){
 function paqueteHTML(p,firma){
   const d=p.datos||{}, logo=new URL(GUA_LOGO,location.href).href;
   const F=(s)=>esc(s||'');
+  // b112 — el logo OFICIAL de la aerolínea, el mismo archivo que usa el voucher (verificado contra la
+  // fuente en b91). Antes acá iba un badge con las DOS PRIMERAS LETRAS del nombre, que no es un código
+  // y salía mal: "JetSmart" daba "JE" cuando el código es JA. Lo vio Nacho en la pieza.
+  // 🔑 Si la aerolínea no está en el mapa NO se dibuja nada: el nombre ya va abajo, en la línea de
+  //    detalle. Misma regla que el voucher — nunca una imagen rota ni un código inventado.
+  // ⚠️ El nombre viene como figura en el PDF de Atlas, que usa la RAZÓN SOCIAL: "GOL TRANSPORTES
+  //    AEREOS", "LATAM AIRLINES GROUP". Comparar por igualdad exacta contra la clave "GOL" no matchea
+  //    y el logo no salía aunque el archivo estuviera en el repo. Se compara por PALABRA —no por
+  //    substring suelto, que podría pegar dentro de otra palabra.
+  const logoAerolinea=(nombre)=>{
+    const palabras=String(nombre||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .split(/[^a-z0-9]+/).filter(Boolean);
+    if(!palabras.length) return '';
+    const norm=s=>String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+    const clave=Object.keys(CONFIG.VOUCHER_LOGO||{}).find(k=>palabras.includes(norm(k)));
+    if(!clave) return '';
+    return `<img src="${new URL(CONFIG.VOUCHER_LOGO[clave],location.href).href}" alt="${F(clave)}"/>`;
+  };
+  // b112 — las condiciones de la pieza = las del PDF + las FIJAS de CONFIG, sin repetir. La comparación
+  // es sobre el texto sin acentos ni puntuación: el mismo párrafo vuelve de la IA con comas distintas.
+  const normC=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+  const condiciones=Array.isArray(d.condiciones)?d.condiciones.slice():[];
+  (CONFIG.PAQUETE_CONDICIONES_FIJAS||[]).forEach(fija=>{
+    const clave=normC(fija).slice(0,60);
+    if(!condiciones.some(c=>normC(c).includes(clave))) condiciones.push(fija);
+  });
   const hoteles=Array.isArray(d.hoteles)?d.hoteles:[];
   const vuelos=Array.isArray(d.vuelos)?d.vuelos:[];
   const meta=[d.fecha_ida&&d.fecha_vuelta?`<b>${F(formatFecha(d.fecha_ida))} al ${F(formatFecha(d.fecha_vuelta))}</b>`:'',
               d.dias?`<b>${d.dias} días</b>, ${d.noches} noches`:'', F(d.destino||d.titulo)].filter(Boolean).join('<span class="sep">·</span>');
-  const filaVuelo=v=>`<div class="vseg"><div class="vseg-al">${F((v.aerolinea||'').slice(0,2).toUpperCase())}</div>
+  const filaVuelo=v=>`<div class="vseg">${logoAerolinea(v.aerolinea)?`<div class="vseg-al">${logoAerolinea(v.aerolinea)}</div>`:''}
       <div class="vseg-main"><span class="rot">${F(v.tipo||'Ida')}${v.numero?' · vuelo '+F(v.numero):''}</span>
         <div class="ruta">${F(v.origen||v.origen_cod)} <span class="ar">→</span> ${F(v.destino||v.destino_cod)}</div>
         <div class="vmeta">${[F(v.aerolinea),v.fecha?F(formatFecha(v.fecha)):'',(v.origen_cod&&v.destino_cod)?`${F(v.origen_cod)} → ${F(v.destino_cod)}`:''].filter(Boolean).join(' · ')}</div></div>
@@ -4760,7 +4793,8 @@ h3{font-size:17px;font-weight:600;color:var(--gris);margin:22px 0 8px}
 .vuelos{margin:10px 0 2px;border:1px solid var(--linea);border-radius:8px;overflow:hidden}
 .vseg{display:flex;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid var(--linea)}
 .vseg:last-child{border-bottom:none}
-.vseg-al{flex:none;width:42px;height:42px;border:1px solid var(--linea);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--vino)}
+.vseg-al{flex:none;width:52px;height:42px;border:1px solid var(--linea);border-radius:7px;display:flex;align-items:center;justify-content:center;padding:5px}
+.vseg-al img{max-width:100%;max-height:100%;object-fit:contain;display:block}
 .vseg-main{flex:1;min-width:0}
 .rot{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--rojo)}
 .ruta{font-family:'ITC Garamond Std','EB Garamond',Georgia,serif;font-size:19px;font-weight:600;color:var(--tinta)}
@@ -4820,7 +4854,7 @@ h3{font-size:17px;font-weight:600;color:var(--gris);margin:22px 0 8px}
     <div class="firma"><div class="av serif">${F((firma.nombre||'G').trim().charAt(0).toUpperCase())}</div>
       <div><div class="nom">${F(firma.nombre)}</div><div class="rol">${F(firma.cargo||'Asesor de viajes')}</div>
       <div>${firma.telefono?`<a href="tel:${F(firma.telefono)}">${F(firma.telefono)}</a> · `:''}<a href="mailto:${F(firma.email)}">${F(firma.email)}</a></div></div></div>
-    ${(Array.isArray(d.condiciones)&&d.condiciones.length)?`<div class="tyc"><h4>Condiciones</h4><ol>${d.condiciones.map(x=>`<li>${F(x)}</li>`).join('')}</ol></div>`:''}
+    ${condiciones.length?`<div class="tyc"><h4>Condiciones</h4><ol>${condiciones.map(x=>`<li>${F(x)}</li>`).join('')}</ol></div>`:''}
   </div>
   <div class="foot"><img src="${logo}" alt="Guamatur Viajes"/>
     <div>Av. Ricaldoni 2587, Montevideo · guamatur.com</div>
