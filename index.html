@@ -197,6 +197,11 @@
 </head>
 <body>
 
+<!-- 🔴 b119 — Se subió una versión nueva y esta pestaña tiene la vieja. Va ARRIBA DE TODO porque lo que
+     está en juego no es una molestia: es reservar, cobrar o cerrar una venta con un bug ya corregido.
+     Pedido de Nacho el 23-set, después de que le pasara a él mismo probando. -->
+<div id="aviso-version" style="display:none;background:#3a2a00;border-bottom:1px solid var(--yellow);color:var(--yellow);padding:10px 16px;font-size:13px;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:200"></div>
+
 <nav class="nav">
   <div class="nav-brand"><div class="nav-brand-icon">✈</div>Cupos Aéreos <span class="app-version" style="font-size:10px;color:var(--muted);font-weight:400;margin-left:6px"></span></div>
   <div class="nav-links" id="nav-links" style="display:none">
@@ -990,7 +995,7 @@ const sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY,{
 // ⚠️ Una sola versión por cadena y CORTA: el detalle va al CHANGELOG.md, no acá. Nacho ve este texto
 // completo en el encabezado (el resto ve solo el "bNN") y si es largo se desborda; además `APP_VERSION_CORTA`
 // saca el número con un match, así que dos "bNN" en la misma cadena confunden cuál es la versión.
-const APP_VERSION='Fase 2 · 2026-09-23 (b118 · Paquetes apagado en producción con una llave de CONFIG, hasta que Nacho vuelva de licencia y pruebe el circuito. No se borró ningún dato.)';
+const APP_VERSION='Fase 2 · 2026-09-23 (b119 · Si se subió una versión nueva, un cartel arriba le avisa al vendedor que su pestaña tiene la vieja y cuál debería estar viendo.)';
 // Columnas de 'vuelos' legibles por cualquier usuario. EXCLUYE precio_neto: el admin lo lee por RPC admin_get_precio_neto (gateada por es_admin). No usar select('*') sobre vuelos: la columna precio_neto quedó revocada a authenticated.
 // ⚠️ Toda columna que se agregue acá necesita `grant select (col) to authenticated` en la base, si no
 // PostgREST tira 400 y se cae la pantalla entera (gotcha #6). `emitido` viene de la migración 2026-08-06.
@@ -1122,6 +1127,49 @@ function mostrarVersionApp(){
   });
 }
 document.querySelectorAll('.app-version').forEach(e=>{e.textContent=APP_VERSION_CORTA;});
+
+// ═══════ ¿ESTA PESTAÑA TIENE LA VERSIÓN VIEJA? (b119, pedido de Nacho) ═══════
+// 🔴 El problema real: la app queda abierta todo el día y nadie recarga. Y GitHub Pages manda
+//    `Cache-Control: max-age=600`, así que el navegador tiene DERECHO a servir la versión vieja aunque
+//    ya se haya subido otra. Le pasó al propio Nacho probando: seguía en b115 con la b116 publicada
+//    hacía rato, y me marcó cosas que ya estaban resueltas.
+//    En el cotizador el mismo problema costó caro: Gabriela reportó DOS VECES un bug arreglado hacía un
+//    día, y Fiorella publicó cuatro propuestas después de un deploy, con el código anterior.
+//
+// 🔑 Se pregunta por `version.txt`, NO por el ETag de Pages: el ETag es `mtime-tamaño` (lo medí:
+//    "6ab42d55-67996" = fecha en hex + Content-Length), no un hash del contenido. Un rebuild sin
+//    cambios diría "hay versión nueva" sin haberla, y un aviso que miente se ignora a la semana —
+//    justo el día que importa. Tampoco se pide el index.html entero: pesa 420 KB, y con una pestaña
+//    abierta todo el día serían 2,5 MB por hora por vendedor para leer cuatro caracteres.
+//
+// ⚠️ NO recarga solo: el vendedor puede estar en la mitad de cargar 40 pasajeros.
+let _versionAlAbrir=null,_avisoVersionPospuesto=false;
+async function chequearVersion(){
+  let v='';
+  try{
+    const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});
+    if(!r.ok) return;                       // sin version.txt no se dice nada (falla del lado seguro)
+    v=(await r.text()).trim();
+  }catch(e){ return; }                      // sin red: se calla y reintenta en el próximo ciclo
+  if(!v||v.length>30) return;               // si devolvió una página de error, no es una versión
+  if(_versionAlAbrir===null){_versionAlAbrir=v;return;}   // primera lectura: es la referencia
+  if(v===_versionAlAbrir||_avisoVersionPospuesto) return;
+  const caja=document.getElementById('aviso-version'); if(!caja) return;
+  caja.innerHTML=`<span>⚠️ <b>Hay una versión nueva: ${esc(v)}.</b> Esta pestaña está corriendo la <b>${esc(_versionAlAbrir)}</b> — actualizá antes de seguir trabajando.</span>`
+    +`<button class="btn-sm" id="aviso-ver-recargar">Actualizar ahora</button>`
+    +`<button class="btn-sm" id="aviso-ver-luego">Ahora no</button>`;
+  caja.style.display='flex';
+  document.getElementById('aviso-ver-recargar').onclick=()=>location.reload();
+  // "Ahora no" lo esconde hasta que recargue. La pestaña SIGUE teniendo el código viejo, pero un cartel
+  // que vuelve cada 10 minutos mientras alguien carga pasajeros se vuelve un estorbo, y ahí se empieza
+  // a ignorar todo lo que aparece arriba — incluido el que sí importa.
+  document.getElementById('aviso-ver-luego').onclick=()=>{caja.style.display='none';_avisoVersionPospuesto=true;};
+}
+setInterval(chequearVersion,600000);                        // cada 10 minutos
+// Y al volver a la pestaña: la app convive con Atlas, Chatwoot y el mail, se cambia de ventana todo el
+// tiempo. Así el aviso aparece cuando vuelve a mirar, no diez minutos después.
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) chequearVersion(); });
+chequearVersion();                                          // al abrir, para fijar la referencia
 
 // b118 — la llave de paquetes también esconde "Mi firma en los paquetes" de los dos menús. Con la llave
 // apagada no hay paquetes a la vista y ese ítem no significa nada. Se corre al cargar el archivo: los
