@@ -4885,7 +4885,12 @@ h3{font-size:17px;font-weight:600;color:var(--gris);margin:22px 0 8px}
       ${hoteles.map(filaHotel).join('')}
       <p style="font-size:14px;color:#6b7079;text-align:center">Los precios pueden variar al momento de realizar la reserva.</p>`:''}
     ${(Array.isArray(d.no_incluye)&&d.no_incluye.length)?`<h3>No incluye</h3><ul class="bul">${d.no_incluye.map(x=>`<li>${F(x)}</li>`).join('')}</ul>`:''}
-    ${(Array.isArray(d.itinerario)&&d.itinerario.length)?`<h2>Itinerario sugerido</h2>${d.itinerario.map(x=>`<div class="dia"><div class="dnum">${String(x.dia).padStart(2,'0')}</div><div><p class="dtit">${F(x.resumen)}</p><p class="dtxt">${F(x.detalle)}</p></div></div>`).join('')}`:''}
+    <!-- b114 - el itinerario dia por dia se saco de la pieza (decision de Nacho, 23-set). Alargaba el
+         PDF con texto generico ("dia libre para actividades") que no ayuda a vender y empujaba los
+         precios a la segunda hoja. El dato SE SIGUE EXTRAYENDO y queda guardado en paquetes.datos, asi
+         que volver a mostrarlo no obliga a reprocesar ningun PDF.
+         OJO: este comentario vive DENTRO de un template literal de JS. Nada de backticks aca adentro:
+         cierran el string y rompen el archivo entero (paso al escribirlo). -->
     <h2>Tu asesor de viaje</h2>
     <div class="firma"><div class="av serif">${F((firma.nombre||'G').trim().charAt(0).toUpperCase())}</div>
       <div><div class="nom">${F(firma.nombre)}</div><div class="rol">${F(firma.cargo||'Asesor de viajes')}</div>
